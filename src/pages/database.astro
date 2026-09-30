@@ -1,0 +1,106 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+import { MOTORS, PROPS, BATTERIES, ESCS } from '../lib/catalog';
+---
+<AppShell title="Component DB" subtitle="Repositorio de componentes UAV · motores, hélices, baterías y ESCs">
+  <div class="mb-5">
+    <h1 class="text-xl font-semibold tracking-tight">Base de datos de componentes</h1>
+    <p class="text-[13px] text-muted">Catálogo editable que alimenta al Propulsion Designer. Datos eléctricos marcados <span class="badge">est.</span> son estimaciones de clase.</p>
+  </div>
+
+  <!-- Motors -->
+  <section class="mb-6">
+    <div class="mb-2 flex items-center gap-2"><h2 class="text-sm font-semibold">Motores</h2><span class="badge">{MOTORS.length}</span></div>
+    <div class="card overflow-x-auto">
+      <table class="w-full text-[12px]">
+        <thead class="border-b border-border text-left text-[11px] uppercase tracking-wide text-subtle">
+          <tr><th class="px-4 py-2.5">Modelo</th><th class="px-3">KV</th><th class="px-3">Rm</th><th class="px-3">I₀</th><th class="px-3">I máx</th><th class="px-3">P máx</th><th class="px-3">Peso</th><th class="px-3">Celdas</th><th class="px-3 text-right">€</th></tr>
+        </thead>
+        <tbody class="divide-y divide-border font-mono tabular">
+          {MOTORS.map((m) => (
+            <tr class="transition hover:bg-surface2">
+              <td class="px-4 py-2.5 font-sans"><div class="font-medium">{m.brand} {m.name}</div>{m.note && <div class="text-[10px] text-accent">{m.note}</div>}</td>
+              <td class="px-3">{m.kv}</td>
+              <td class="px-3">{m.rm}{m.estimated && <span class="badge ml-1 !px-1 !py-0">est</span>}</td>
+              <td class="px-3">{m.i0}</td>
+              <td class="px-3">{m.iMax} A</td>
+              <td class="px-3">{m.pMax} W</td>
+              <td class="px-3">{m.massG} g</td>
+              <td class="px-3 font-sans text-muted">{m.cells}</td>
+              <td class="px-3 text-right">{m.price ?? '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="grid gap-6 lg:grid-cols-2">
+    <!-- Props -->
+    <section>
+      <div class="mb-2 flex items-center gap-2"><h2 class="text-sm font-semibold">Hélices</h2><span class="badge">{PROPS.length}</span></div>
+      <div class="card overflow-x-auto">
+        <table class="w-full text-[12px]">
+          <thead class="border-b border-border text-left text-[11px] uppercase tracking-wide text-subtle">
+            <tr><th class="px-4 py-2.5">Modelo</th><th class="px-3">Ø</th><th class="px-3">Paso</th><th class="px-3">Palas</th><th class="px-3">Peso</th><th class="px-3 text-right">€</th></tr>
+          </thead>
+          <tbody class="divide-y divide-border font-mono tabular">
+            {PROPS.map((p) => (
+              <tr class="transition hover:bg-surface2">
+                <td class="px-4 py-2.5 font-sans font-medium">{p.brand} {p.name}</td>
+                <td class="px-3">{p.dia}"</td><td class="px-3">{p.pitch}"</td><td class="px-3">{p.blades}</td><td class="px-3">{p.massG} g</td><td class="px-3 text-right">{p.price}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ESCs -->
+    <section>
+      <div class="mb-2 flex items-center gap-2"><h2 class="text-sm font-semibold">ESCs</h2><span class="badge">{ESCS.length}</span></div>
+      <div class="card overflow-x-auto">
+        <table class="w-full text-[12px]">
+          <thead class="border-b border-border text-left text-[11px] uppercase tracking-wide text-subtle">
+            <tr><th class="px-4 py-2.5">Modelo</th><th class="px-3">I máx</th><th class="px-3">η</th><th class="px-3">Peso</th><th class="px-3 text-right">€</th></tr>
+          </thead>
+          <tbody class="divide-y divide-border font-mono tabular">
+            {ESCS.map((e) => (
+              <tr class="transition hover:bg-surface2">
+                <td class="px-4 py-2.5 font-sans font-medium">{e.brand} {e.name}</td>
+                <td class="px-3">{e.iMax} A</td><td class="px-3">{(e.efficiency*100).toFixed(0)}%</td><td class="px-3">{e.massG} g</td><td class="px-3 text-right">{e.price}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- Batteries -->
+  <section class="mt-6">
+    <div class="mb-2 flex items-center gap-2"><h2 class="text-sm font-semibold">Baterías</h2><span class="badge">{BATTERIES.length}</span></div>
+    <div class="card overflow-x-auto">
+      <table class="w-full text-[12px]">
+        <thead class="border-b border-border text-left text-[11px] uppercase tracking-wide text-subtle">
+          <tr><th class="px-4 py-2.5">Modelo</th><th class="px-3">Química</th><th class="px-3">S</th><th class="px-3">V nom</th><th class="px-3">Cap</th><th class="px-3">C</th><th class="px-3">I máx</th><th class="px-3">Peso</th><th class="px-3 text-right">€</th></tr>
+        </thead>
+        <tbody class="divide-y divide-border font-mono tabular">
+          {BATTERIES.map((b) => (
+            <tr class="transition hover:bg-surface2">
+              <td class="px-4 py-2.5 font-sans font-medium">{b.brand} {b.name}</td>
+              <td class="px-3 font-sans text-muted">{b.chemistry}</td>
+              <td class="px-3">{b.cells}S</td>
+              <td class="px-3">{(b.cells*b.vcell).toFixed(1)} V</td>
+              <td class="px-3">{b.capacityMah} mAh</td>
+              <td class="px-3">{b.cRating}C</td>
+              <td class="px-3">{(b.cRating*b.capacityMah/1000).toFixed(0)} A</td>
+              <td class="px-3">{b.massG} g</td>
+              <td class="px-3 text-right">{b.price}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</AppShell>

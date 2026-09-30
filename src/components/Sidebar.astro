@@ -1,0 +1,83 @@
+---
+const { path = '/' } = Astro.props;
+
+const groups = [
+  {
+    label: 'General',
+    items: [{ href: '/', label: 'Dashboard', icon: 'grid' }],
+  },
+  {
+    label: 'XtraChallenge 2027',
+    items: [
+      { href: '/xc27', label: 'Reglamento y puntos', icon: 'flag', tag: 'XC27' },
+      { href: '/xc27-avion', label: 'Estudio de avión', icon: 'plane', tag: 'LIVE' },
+    ],
+  },
+  {
+    label: 'Herramientas',
+    items: [
+      { href: '/propulsion', label: 'Propulsion Designer', icon: 'bolt', tag: 'LIVE' },
+      { href: '/competition', label: 'Mission Simulator', icon: 'trophy', tag: 'LIVE' },
+      { href: '/cfd', label: 'CFD Studio', icon: 'wind', tag: 'LIVE' },
+      { href: '/team', label: 'Team Hub', icon: 'users' },
+    ],
+  },
+  {
+    label: 'Recursos',
+    items: [
+      { href: '/database', label: 'Component DB', icon: 'chip' },
+      { href: '/copilot', label: 'AI Copilot', icon: 'spark' },
+    ],
+  },
+];
+
+const icons: Record<string, string> = {
+  grid: '<path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>',
+  bolt: '<path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z"/>',
+  trophy: '<path d="M8 21h8M12 17v4M6 4h12v4a6 6 0 0 1-12 0zM6 6H3v2a4 4 0 0 0 4 4M18 6h3v2a4 4 0 0 1-4 4"/>',
+  wind: '<path d="M3 8h11a3 3 0 1 0-3-3M3 16h14a3 3 0 1 1-3 3M3 12h18"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11"/>',
+  chip: '<path d="M9 3v2M15 3v2M9 19v2M15 19v2M3 9h2M3 15h2M19 9h2M19 15h2"/><rect x="6" y="6" width="12" height="12" rx="2"/>',
+  flag: '<path d="M4 22V4M4 4h13l-2 4 2 4H4"/>',
+  plane: '<path d="M2 16l20-7-7 12-3-6-6-2zM12 15l3-4"/>',
+  spark: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/>',
+};
+---
+<aside class="hidden lg:flex w-60 shrink-0 flex-col border-r border-border bg-surface/60 backdrop-blur">
+  <div class="flex h-14 items-center gap-2.5 px-4 border-b border-border">
+    <div class="grid h-7 w-7 place-items-center rounded-md bg-accent text-accent-fg">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 2 19h20L12 2zm0 5 5.5 9.5h-11L12 7z"/></svg>
+    </div>
+    <div class="leading-tight">
+      <div class="text-[13px] font-semibold tracking-tight">UAV Design Suite</div>
+      <div class="text-[10px] text-subtle font-mono">v0.1 · engineering</div>
+    </div>
+  </div>
+
+  <nav class="flex-1 overflow-y-auto px-2.5 py-3 space-y-5">
+    {groups.map((g) => (
+      <div>
+        <div class="px-2.5 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-subtle">{g.label}</div>
+        <div class="space-y-0.5">
+          {g.items.map((it) => (
+            <a href={it.href} class="nav-link" aria-current={path === it.href ? 'page' : undefined}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" set:html={icons[it.icon]} />
+              <span class="flex-1">{it.label}</span>
+              {it.tag && <span class={`rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wide ${it.tag === 'LIVE' ? 'bg-success/15 text-success' : 'bg-accent/15 text-accent'}`}>{it.tag}</span>}
+            </a>
+          ))}
+        </div>
+      </div>
+    ))}
+  </nav>
+
+  <div class="border-t border-border p-3">
+    <div class="card flex items-center gap-2.5 p-2.5">
+      <div class="grid h-8 w-8 place-items-center rounded-full bg-surface2 text-xs font-semibold">RG</div>
+      <div class="min-w-0 leading-tight">
+        <div class="truncate text-[12px] font-medium">Ricardo</div>
+        <div class="truncate text-[10px] text-subtle">Plan Pro · Equipo UAV</div>
+      </div>
+    </div>
+  </div>
+</aside>

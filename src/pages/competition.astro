@@ -1,0 +1,881 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+import { MISSION_TYPES } from '../lib/mission';
+import { AIRFOILS } from '../lib/airfoils';
+import { MOTORS, PROPS, BATTERIES } from '../lib/catalog';
+import { AVIONICS } from '../lib/avionics';
+
+const sectors = [...new Set(MISSION_TYPES.map((m) => m.sector))];
+const catalogSize = MOTORS.length + PROPS.length + BATTERIES.length + AIRFOILS.length + AVIONICS.length;
+---
+<AppShell title="Mission Simulator" subtitle="Simulador de puntuaciones multimisión · optimización de planta motriz, perfil alar y aviónica">
+  <script is:inline src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight">Mission Simulator</h1>
+      <p class="max-w-2xl text-[13px] text-muted">
+        Define la misión con variables y objetivos ponderados; el simulador cruza el catálogo real
+        ({catalogSize} componentes) con la aerodinámica y la propulsión, y responde con el avión que más puntúa:
+        <strong class="text-fg">planta motriz, perfil alar y electrónica</strong>.
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <select id="sel-breadth" class="field !w-auto">
+        <option value="rapido">Búsqueda rápida</option>
+        <option value="estandar" selected>Búsqueda estándar</option>
+        <option value="exhaustivo">Búsqueda exhaustiva</option>
+      </select>
+      <button id="btn-run" class="btn btn-primary">Optimizar diseño</button>
+      <button id="btn-json" class="btn">Exportar JSON</button>
+      <button id="btn-csv" class="btn">Exportar CSV</button>
+      <button id="btn-study" class="btn hidden" title="Abre este diseño en el estudio de avión XC27">Estudiar avión →</button>
+    </div>
+  </div>
+
+  <div class="grid gap-5 xl:grid-cols-[360px_1fr]">
+    <!-- ==================== ENTRADAS ==================== -->
+    <aside class="space-y-4 xl:sticky xl:top-20 xl:self-start xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto xl:pr-1">
+      <div class="card p-4">
+        <div class="mb-2 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Tipo de misión</div>
+        <select id="sel-mission" class="field">
+          {sectors.map((s) => (
+            <optgroup label={s}>
+              {MISSION_TYPES.filter((m) => m.sector === s).map((m) => (
+                <option value={m.id}>{m.name}</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        <p id="mission-summary" class="mt-2.5 text-[11px] leading-relaxed text-muted"></p>
+        <div id="mission-hint" class="mt-2.5 rounded-lg border border-accent/25 bg-accent/5 p-2.5 text-[11px] leading-relaxed text-muted"></div>
+      </div>
+
+      <div class="card p-4">
+        <div class="mb-3 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Variables de misión</div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div><label class="field-label">Carga útil (g)</label><input id="v-payload" type="number" step="50" class="field" /></div>
+          <div>
+            <label class="field-label">Modo de carga</label>
+            <select id="v-payloadmode" class="field"><option value="fija">Fija (la impone la misión)</option><option value="maxima">Variable (optimizar)</option></select>
+          </div>
+          <div><label class="field-label">Distancia de ida (km)</label><input id="v-leg" type="number" step="1" class="field" /></div>
+          <div><label class="field-label">Tiempo en zona (min)</label><input id="v-loiter" type="number" step="5" class="field" /></div>
+          <div><label class="field-label">Altura crucero (m)</label><input id="v-alt" type="number" step="20" class="field" /></div>
+          <div><label class="field-label">Elevación campo (m)</label><input id="v-elev" type="number" step="50" class="field" /></div>
+          <div><label class="field-label">Viento medio (m/s)</label><input id="v-wind" type="number" step="1" class="field" /></div>
+          <div><label class="field-label">Pista (m, 0 = a mano)</label><input id="v-runway" type="number" step="5" class="field" /></div>
+          <div><label class="field-label">Reserva batería (%)</label><input id="v-reserve" type="number" step="5" class="field" /></div>
+          <div><label class="field-label">Ancho de pasada (m)</label><input id="v-swath" type="number" step="10" class="field" /></div>
+          <div><label class="field-label">Envergadura máx (m)</label><input id="v-span" type="number" step="0.1" class="field" /></div>
+          <div><label class="field-label">MTOW máx (kg)</label><input id="v-mtow" type="number" step="0.5" class="field" /></div>
+          <div><label class="field-label">Celdas máx (S)</label><input id="v-cells" type="number" step="1" class="field" /></div>
+          <div><label class="field-label">Packs en paralelo</label><input id="v-packs" type="number" step="1" min="1" max="4" class="field" /></div>
+          <div><label class="field-label">ESC mínimo (A)</label><input id="v-esc" type="number" step="5" class="field" /></div>
+          <div>
+            <label class="field-label">Construcción</label>
+            <select id="v-build" class="field">
+              <option value="0.78">Fibra de carbono (−22 %)</option>
+              <option value="1" selected>Mixta balsa/composite</option>
+              <option value="1.2">Conservadora (+20 %)</option>
+            </select>
+          </div>
+          <div class="col-span-2">
+            <label class="field-label">Motor obligatorio (reglamento)</label>
+            <select id="v-lockmotor" class="field">
+              <option value="">Libre — elige el optimizador</option>
+              {MOTORS.map((m) => <option value={m.id}>{m.name}</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-4">
+        <div class="mb-1 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Objetivos y pesos</div>
+        <p class="mb-3 text-[10px] leading-relaxed text-subtle">Cada objetivo normaliza una métrica entre su valor «suspenso» y el «excelente». Mueve los pesos y el optimizador cambiará de familia de avión, no sólo de componente.</p>
+        <div id="obj-list" class="space-y-3"></div>
+      </div>
+
+      <div class="card p-4">
+        <div class="mb-3 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Electrónica requerida</div>
+        <div class="mb-2.5">
+          <label class="field-label">Criterio de selección</label>
+          <select id="v-avpref" class="field">
+            <option value="masa">Mínima masa</option>
+            <option value="potencia">Mínimo consumo</option>
+            <option value="precio">Mínimo coste</option>
+            <option value="capacidad">Máximas prestaciones</option>
+          </select>
+        </div>
+        <div id="av-list" class="grid grid-cols-2 gap-x-3 gap-y-1.5"></div>
+      </div>
+
+      <div id="xc-card" class="card hidden p-4">
+        <div class="mb-1 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Reglamento XC26</div>
+        <p class="mb-3 text-[10px] leading-relaxed text-subtle">La puntuación es relativa: cada parcial se normaliza contra la mejor marca de la ronda.</p>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div><label class="field-label">PL máx (g)</label><input id="xc-plmax" type="number" class="field" /></div>
+          <div><label class="field-label">Dist máx 150 s (m)</label><input id="xc-distmax" type="number" class="field" /></div>
+          <div><label class="field-label">Corriente mín (A)</label><input id="xc-currmin" type="number" step="0.5" class="field" /></div>
+          <div><label class="field-label">Coef. carga máx</label><input id="xc-ctmax" type="number" step="1" class="field" /></div>
+          <div><label class="field-label">Tiempo mín (s)</label><input id="xc-timemin" type="number" step="1" class="field" /></div>
+          <div><label class="field-label">Fracción agua</label><input id="xc-waterfrac" type="number" step="0.05" min="0" max="1" class="field" /></div>
+          <div><label class="field-label">Carga base (s)</label><input id="xc-loadbase" type="number" step="1" class="field" /></div>
+          <div><label class="field-label">Caudal carga (g/s)</label><input id="xc-loadrate" type="number" step="1" class="field" /></div>
+          <div>
+            <label class="field-label">Despegue</label>
+            <select id="xc-takeoff" class="field"><option value="60">60 m (×1)</option><option value="40">40 m (×1.125)</option><option value="20" selected>20 m (×1.25)</option></select>
+          </div>
+          <div>
+            <label class="field-label">Aterrizaje</label>
+            <select id="xc-landing" class="field"><option value="none">Fuera (×1)</option><option value="20-30">20–30 m (×1.05)</option><option value="10-20" selected>10–20 m (×1.15)</option><option value="0-10">0–10 m (×1.25)</option></select>
+          </div>
+        </div>
+        <div class="mt-2.5 space-y-1">
+          <label class="flex items-center gap-2 text-[12px] text-muted"><input id="xc-extpilot" type="checkbox" class="accent-accent" /> Piloto externo (−25 %)</label>
+          <label class="flex items-center gap-2 text-[12px] text-muted"><input id="xc-spare" type="checkbox" class="accent-accent" /> Penalización por repuestos (−25 %)</label>
+        </div>
+      </div>
+
+      <div id="xc27-card" class="card hidden p-4">
+        <div class="mb-1 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Reglamento XC27 · estrategia de ronda</div>
+        <p class="mb-3 text-[10px] leading-relaxed text-subtle">P_ronda = 750 · P_equipo / P_max. La marca de despegue (20/40/60 m) la elige el simulador según la carrera y el margen.</p>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div><label class="field-label" title="P_equipo de la mejor marca de la ronda">P_max de referencia</label><input id="x27-pmax" type="number" step="0.1" class="field" /></div>
+          <div>
+            <label class="field-label" title="§9.5.4: el texto dice kg">Unidad de P_CA</label>
+            <select id="x27-unit" class="field"><option value="kg">kg (texto §9.5.4)</option><option value="g">gramos</option></select>
+          </div>
+          <div><label class="field-label" title="Techo operativo: 120 m menos el margen del piloto">Techo de ascenso (m)</label><input id="x27-ceiling" type="number" step="5" max="120" class="field" /></div>
+          <div><label class="field-label" title="Altitud a la que se reenciende el motor (mín. 10 m)">Fin de planeo (m)</label><input id="x27-glideend" type="number" step="1" min="10" class="field" /></div>
+          <div><label class="field-label" title="Fracción del ascenso ideal que logra el piloto">Eficacia de ascenso</label><input id="x27-climbeff" type="number" step="0.05" min="0.3" max="1" class="field" /></div>
+          <div><label class="field-label" title="Pérdidas del planeo real: virajes, ráfagas, pilotaje">Eficacia de planeo</label><input id="x27-glidef" type="number" step="0.05" min="0.3" max="1" class="field" /></div>
+          <div><label class="field-label" title="Carrera simulada × margen ≤ marca declarada">Margen de despegue ×</label><input id="x27-tomargin" type="number" step="0.05" min="1" class="field" /></div>
+          <div><label class="field-label" title="Factor de carga máximo en los virajes de pilones">g máx en pilones</label><input id="x27-maxg" type="number" step="0.5" min="1.5" class="field" /></div>
+          <div><label class="field-label" title="Tiempo fijo de carga + descarga">Carga/descarga base (s)</label><input id="x27-loadbase" type="number" step="1" class="field" /></div>
+          <div><label class="field-label" title="Caudal medio de arroz contando carga y descarga">Caudal de arroz (g/s)</label><input id="x27-loadrate" type="number" step="10" class="field" /></div>
+          <div class="col-span-2"><label class="field-label" title="0.9 = llevar el 90 % de lo declarado, que puntúa como el 100 %">Carga transportada / declarada</label><input id="x27-carry" type="number" step="0.01" min="0.5" max="1" class="field" /></div>
+        </div>
+        <div class="mt-2.5 space-y-1">
+          <label class="flex items-center gap-2 text-[12px] text-muted"><input id="x27-beyond" type="checkbox" class="accent-accent" /> Seguir subiendo tras los 60 s (si se permite)</label>
+          <label class="flex items-center gap-2 text-[12px] text-muted"><input id="x27-extpilot" type="checkbox" class="accent-accent" /> Piloto externo (−25 %)</label>
+        </div>
+        <a href="/xc27" class="mt-3 block text-[11px] text-accent hover:underline">Reglamento, calculadora de ronda y conformidad →</a>
+      </div>
+    </aside>
+
+    <!-- ==================== RESULTADOS ==================== -->
+    <section class="space-y-5">
+      <div id="progress" class="card hidden p-4">
+        <div class="mb-2 flex items-center justify-between text-[12px]"><span id="prog-stage" class="font-medium">Preparando…</span><span id="prog-pct" class="font-mono text-subtle">0 %</span></div>
+        <div class="h-1.5 overflow-hidden rounded-full bg-surface2"><div id="prog-bar" class="h-full rounded-full bg-accent transition-all" style="width:0%"></div></div>
+      </div>
+
+      <div id="notes" class="space-y-2"></div>
+
+      <div id="empty" class="card p-8 text-center">
+        <div class="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-xl bg-surface2 text-accent">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/></svg>
+        </div>
+        <div class="text-sm font-semibold">Elige una misión y pulsa «Optimizar diseño»</div>
+        <p class="mx-auto mt-1 max-w-md text-[12px] leading-relaxed text-muted">
+          El simulador barrerá células paramétricas (envergadura, alargamiento y los {AIRFOILS.length} perfiles del catálogo)
+          contra cada tren propulsivo viable, resolverá el vuelo trimado de cada combinación y puntuará la misión.
+        </p>
+      </div>
+
+      <div id="results" class="hidden space-y-5">
+        <!-- KPIs -->
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="card p-4 ring-1 ring-accent/30">
+            <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Puntuación</div>
+            <div class="mt-1 font-mono text-3xl font-semibold tabular" id="k-score">—</div>
+            <div class="text-[11px] text-subtle" id="k-scorelabel">—</div>
+          </div>
+          <div class="card p-4">
+            <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Avión recomendado</div>
+            <div class="mt-1 truncate font-mono text-lg font-semibold" id="k-plane">—</div>
+            <div class="text-[11px] text-subtle" id="k-planesub">—</div>
+          </div>
+          <div class="card p-4">
+            <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Prestación clave</div>
+            <div class="mt-1 font-mono text-lg font-semibold" id="k-perf">—</div>
+            <div class="text-[11px] text-subtle" id="k-perfsub">—</div>
+          </div>
+          <div class="card p-4">
+            <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Espacio explorado</div>
+            <div class="mt-1 font-mono text-lg font-semibold" id="k-space">—</div>
+            <div class="text-[11px] text-subtle" id="k-spacesub">—</div>
+          </div>
+        </div>
+
+        <!-- Ficha del avión -->
+        <div class="card overflow-hidden">
+          <div class="flex items-center justify-between border-b border-border bg-surface2/50 px-4 py-2.5">
+            <span class="text-[12px] font-semibold">Prototipo recomendado</span>
+            <span class="badge" id="design-rank">#1</span>
+          </div>
+          <div class="grid divide-y divide-border lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+            <div class="p-4">
+              <div class="mb-2.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-accent">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z"/></svg> Planta motriz
+              </div>
+              <dl id="rec-power" class="space-y-1.5 text-[12px]"></dl>
+            </div>
+            <div class="p-4">
+              <div class="mb-2.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-accent">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h11a3 3 0 1 0-3-3M3 16h14a3 3 0 1 1-3 3M3 12h18"/></svg> Célula y perfil alar
+              </div>
+              <dl id="rec-airframe" class="space-y-1.5 text-[12px]"></dl>
+              <div id="planform-svg" class="mt-3 rounded-lg border border-border bg-surface2 p-2"></div>
+            </div>
+            <div class="p-4">
+              <div class="mb-2.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-accent">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 3v2M15 3v2M9 19v2M15 19v2M3 9h2M3 15h2M19 9h2M19 15h2"/></svg> Electrónica embarcada
+              </div>
+              <div id="rec-avionics" class="space-y-1 text-[12px]"></div>
+            </div>
+          </div>
+          <div class="border-t border-border p-4">
+            <div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-subtle">Reparto de masas</div>
+            <div id="mass-bar" class="flex h-3 overflow-hidden rounded-full bg-surface2"></div>
+            <div id="mass-legend" class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted"></div>
+          </div>
+        </div>
+
+        <!-- Prestaciones -->
+        <div class="card overflow-hidden">
+          <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Prestaciones simuladas</div>
+          <div id="perf-grid" class="grid grid-cols-2 gap-px bg-border sm:grid-cols-3 lg:grid-cols-4"></div>
+        </div>
+
+        <!-- Puntuación -->
+        <div class="grid gap-5 lg:grid-cols-2">
+          <div class="card overflow-hidden">
+            <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold" id="score-title">Desglose de puntuación</div>
+            <div id="xc-breakdown" class="hidden border-b border-border p-4"></div>
+            <div id="score-subtitle" class="hidden border-b border-border px-4 py-2 text-[11px] text-subtle"></div>
+            <div id="score-bars" class="divide-y divide-border text-[13px]"></div>
+          </div>
+          <div class="card overflow-hidden">
+            <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Restricciones de la misión</div>
+            <div id="constraint-list" class="divide-y divide-border text-[12px]"></div>
+          </div>
+        </div>
+
+        <!-- Justificación + sensibilidad -->
+        <div class="grid gap-5 lg:grid-cols-2">
+          <div class="card overflow-hidden">
+            <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Por qué gana este avión</div>
+            <ul id="why-list" class="space-y-2 p-4 text-[12px] leading-relaxed text-muted"></ul>
+          </div>
+          <div class="card overflow-hidden">
+            <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Sensibilidad — ¿qué cambiar ahora?</div>
+            <div id="sens-list" class="space-y-2.5 p-4"></div>
+          </div>
+        </div>
+
+        <!-- Alternativas + nube -->
+        <div class="card overflow-hidden">
+          <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Alternativas (pulsa para ver la ficha)</div>
+          <div class="overflow-x-auto">
+            <table class="w-full min-w-[760px] text-[12px]">
+              <thead class="text-left text-[10px] uppercase tracking-wide text-subtle">
+                <tr class="border-b border-border">
+                  <th class="px-4 py-2 font-semibold">#</th>
+                  <th class="px-3 py-2 font-semibold">Perfil</th>
+                  <th class="px-3 py-2 font-semibold">Célula</th>
+                  <th class="px-3 py-2 font-semibold">Planta motriz</th>
+                  <th class="px-3 py-2 text-right font-semibold">MTOW</th>
+                  <th id="alt-h1" class="px-3 py-2 text-right font-semibold">Autonomía</th>
+                  <th id="alt-h2" class="px-3 py-2 text-right font-semibold">V crucero</th>
+                  <th class="px-4 py-2 text-right font-semibold">Puntos</th>
+                </tr>
+              </thead>
+              <tbody id="alt-table" class="divide-y divide-border"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card p-3">
+          <div class="mb-1 px-1 text-[12px] font-semibold">Nube de diseños <span class="font-normal text-subtle">— puntuación frente a masa al despegue</span></div>
+          <div id="cloud" class="h-72"></div>
+        </div>
+
+        <p class="text-[11px] leading-relaxed text-subtle">
+          Cadena de cálculo: masas por densidades superficiales → línea sustentadora de Prandtl para CLα, e y distribución de carga
+          → polar de sección real del perfil corregida por Reynolds + drag parásito por componentes → equilibrio L = W y T = D resuelto
+          contra el mapa de empuje/corriente del tren propulsivo (modelo Kv + Ct(J)/Cp(J) del catálogo) → autonomía con la carga hotel
+          de la aviónica sobre el mismo pack. La velocidad de crucero y la carga útil no se imponen: se elige el punto que más puntúa en la misión.
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    import { MISSION_TYPES, METRICS, missionById, type MissionType, type MissionVariables, type Objective } from '../lib/mission';
+    import { AVIONICS, AVIONICS_TAG_LABEL, type AvionicsTag } from '../lib/avionics';
+    import { optimize, type OptimizeConfig, type OptimizeResult, type RankedDesign, type Breadth } from '../lib/optimizer';
+    import { XC_DEFAULT_REFS, XC_DEFAULT_ASSUMPTIONS, type XcRoundRefs, type XcAssumptions } from '../lib/scoring';
+    import { rootChordOf, packWh, rhoOf } from '../lib/design';
+    import { XC27_DEFAULT_STRATEGY, type Xc27Strategy } from '../lib/xc27-flight';
+    import { specFromEvaluation } from '../lib/xc27-study';
+
+    const $ = (id: string) => document.getElementById(id)!;
+    const num = (id: string) => parseFloat(($(id) as HTMLInputElement).value) || 0;
+    const val = (id: string) => ($(id) as HTMLSelectElement | HTMLInputElement).value;
+    const chk = (id: string) => ($(id) as HTMLInputElement).checked;
+    const setVal = (id: string, v: string | number) => { ($(id) as HTMLInputElement).value = String(v); };
+
+    let mission: MissionType = MISSION_TYPES[0];
+    let objectives: Objective[] = [];
+    let result: OptimizeResult | null = null;
+    let selected = 0;
+
+    // ---------------- carga del tipo de misión ----------------
+    function loadMission(id: string) {
+      mission = missionById(id);
+      objectives = mission.objectives.map((o) => ({ ...o }));
+      const v = mission.vars;
+      $('mission-summary').textContent = mission.summary;
+      $('mission-hint').innerHTML = `<strong class="text-fg">Clave de diseño.</strong> ${mission.designHint}`;
+
+      setVal('v-payload', v.payloadG); setVal('v-leg', v.legDistanceKm); setVal('v-loiter', v.loiterMin);
+      setVal('v-alt', v.cruiseAltM); setVal('v-elev', v.fieldElevM); setVal('v-wind', v.windMs);
+      setVal('v-runway', v.runwayM); setVal('v-reserve', v.reservePct); setVal('v-swath', v.swathM);
+      setVal('v-span', v.maxSpanM); setVal('v-mtow', v.maxMtowKg); setVal('v-cells', v.maxCells);
+      setVal('v-packs', v.maxPacksParallel); setVal('v-esc', v.escMinA);
+      ($('v-payloadmode') as HTMLSelectElement).value = v.payloadMode;
+      ($('v-lockmotor') as HTMLSelectElement).value = v.lockMotorId;
+      ($('v-avpref') as HTMLSelectElement).value = v.avionicsPreference;
+      ($('v-build') as HTMLSelectElement).value = v.buildFactor === 0.78 ? '0.78' : v.buildFactor === 1.2 ? '1.2' : '1';
+
+      renderObjectives();
+      renderAvionics();
+      $('xc-card').classList.toggle('hidden', !mission.scorer.startsWith('xc26'));
+      $('xc27-card').classList.toggle('hidden', mission.scorer !== 'xc27');
+      $('btn-study').classList.toggle('hidden', mission.scorer !== 'xc27');
+    }
+
+    function renderObjectives() {
+      $('obj-list').innerHTML = objectives.map((o, i) => {
+        const info = METRICS[o.metric];
+        const dir = o.goal === 'max' ? 'maximizar' : o.goal === 'min' ? 'minimizar' : 'acercarse a';
+        return `<div>
+          <div class="flex items-baseline justify-between gap-2">
+            <label class="text-[12px] font-medium">${info.label}</label>
+            <span class="font-mono text-[11px] text-subtle" id="ow-${i}">${o.weight}</span>
+          </div>
+          <input type="range" min="0" max="120" step="5" value="${o.weight}" data-obj="${i}" class="mt-1 w-full accent-accent" />
+          <div class="text-[10px] text-subtle">${dir} · 0 pts en ${o.poor}${info.unit} → máximo en ${o.good}${info.unit}</div>
+        </div>`;
+      }).join('');
+      $('obj-list').querySelectorAll('input[data-obj]').forEach((el) => {
+        el.addEventListener('input', (e) => {
+          const t = e.target as HTMLInputElement;
+          const i = parseInt(t.dataset.obj!, 10);
+          objectives[i].weight = parseFloat(t.value);
+          $(`ow-${i}`).textContent = t.value;
+        });
+      });
+    }
+
+    function renderAvionics() {
+      const req = new Set(mission.requiredAvionics);
+      const tags = [...new Set(AVIONICS.map((a) => a.tag))];
+      $('av-list').innerHTML = tags.map((t) => `
+        <label class="flex items-center gap-1.5 text-[11px] text-muted">
+          <input type="checkbox" class="accent-accent" data-av="${t}" ${req.has(t) ? 'checked' : ''} />
+          <span class="truncate">${AVIONICS_TAG_LABEL[t]}</span>
+        </label>`).join('');
+    }
+
+    const readAvionics = (): AvionicsTag[] =>
+      [...$('av-list').querySelectorAll<HTMLInputElement>('input[data-av]')]
+        .filter((el) => el.checked).map((el) => el.dataset.av as AvionicsTag);
+
+    function readVars(): MissionVariables {
+      return {
+        // campos que el formulario no expone (caja de telemetría, batería auxiliar…)
+        ...mission.vars,
+        payloadG: num('v-payload'),
+        payloadMode: val('v-payloadmode') as MissionVariables['payloadMode'],
+        maxPacksParallel: Math.max(1, num('v-packs')),
+        legDistanceKm: num('v-leg'), loiterMin: num('v-loiter'),
+        cruiseAltM: num('v-alt'), fieldElevM: num('v-elev'),
+        windMs: num('v-wind'), runwayM: num('v-runway'),
+        reservePct: num('v-reserve'), maxSpanM: Math.max(0.6, num('v-span')),
+        maxMtowKg: Math.max(0.3, num('v-mtow')), maxCells: Math.max(2, num('v-cells')),
+        escMinA: num('v-esc'), swathM: num('v-swath'),
+        lockMotorId: val('v-lockmotor'), buildFactor: parseFloat(val('v-build')) || 1,
+        avionicsPreference: val('v-avpref') as MissionVariables['avionicsPreference'],
+      };
+    }
+
+    const readRefs = (): XcRoundRefs => mission.scorer === 'generic' ? XC_DEFAULT_REFS : {
+      plMaxG: num('xc-plmax'), distanceMaxM: num('xc-distmax'), currentMinA: num('xc-currmin'),
+      loadCoeffMax: num('xc-ctmax'), timeMinS: num('xc-timemin'),
+    };
+
+    const readAssumptions = (): XcAssumptions => mission.scorer === 'generic' ? XC_DEFAULT_ASSUMPTIONS : {
+      ...XC_DEFAULT_ASSUMPTIONS,
+      waterFrac: Math.min(1, Math.max(0, num('xc-waterfrac'))),
+      loadBaseS: num('xc-loadbase'), loadRateGs: Math.max(1, num('xc-loadrate')),
+      takeoff: val('xc-takeoff') as XcAssumptions['takeoff'],
+      landing: val('xc-landing') as XcAssumptions['landing'],
+      externalPilot: chk('xc-extpilot'), sparePenalty: chk('xc-spare'),
+    };
+
+    const readStrategy = (): Xc27Strategy => ({
+      ...XC27_DEFAULT_STRATEGY,
+      pMaxRef: Math.max(0.05, num('x27-pmax')),
+      payloadUnit: val('x27-unit') as Xc27Strategy['payloadUnit'],
+      altCeilingM: Math.min(120, Math.max(20, num('x27-ceiling'))),
+      glideEndAltM: Math.max(10, num('x27-glideend')),
+      climbEfficiency: Math.min(1, Math.max(0.3, num('x27-climbeff'))),
+      glidePathFactor: Math.min(1, Math.max(0.3, num('x27-glidef'))),
+      takeoffMargin: Math.max(1, num('x27-tomargin')),
+      pylonMaxG: Math.max(1.5, num('x27-maxg')),
+      loadBaseS: Math.max(0, num('x27-loadbase')),
+      loadRateGs: Math.max(1, num('x27-loadrate')),
+      carryFraction: Math.min(1, Math.max(0.5, num('x27-carry'))),
+      climbBeyond60: chk('x27-beyond'),
+      externalPilot: chk('x27-extpilot'),
+    });
+
+    // ---------------- ejecución ----------------
+    async function run() {
+      const btn = $('btn-run') as HTMLButtonElement;
+      btn.disabled = true; btn.textContent = 'Optimizando…';
+      $('progress').classList.remove('hidden');
+      $('empty').classList.add('hidden');
+
+      const cfg: OptimizeConfig = {
+        mission, vars: readVars(), objectives, constraints: mission.constraints,
+        requiredAvionics: readAvionics(), xcRefs: readRefs(), xcAssumptions: readAssumptions(),
+        xc27: mission.scorer === 'xc27' ? readStrategy() : undefined,
+        breadth: val('sel-breadth') as Breadth,
+      };
+
+      try {
+        result = await optimize(cfg, (p) => {
+          const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
+          $('prog-stage').textContent = p.stage;
+          $('prog-pct').textContent = pct + ' %';
+          ($('prog-bar') as HTMLElement).style.width = pct + '%';
+        });
+        selected = 0;
+        render();
+      } catch (err) {
+        $('notes').innerHTML = note('danger', `Error durante la optimización: ${(err as Error).message}`);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Optimizar diseño';
+        $('progress').classList.add('hidden');
+      }
+    }
+
+    // Clases literales: Tailwind sólo genera lo que encuentra escrito en el fuente.
+    const NOTE_CLASS = {
+      warning: 'border-warning/40 bg-warning/5 text-warning',
+      danger: 'border-danger/40 bg-danger/5 text-danger',
+      accent: 'border-accent/40 bg-accent/5 text-accent',
+    } as const;
+    const note = (kind: keyof typeof NOTE_CLASS, html: string) =>
+      `<div class="card ${NOTE_CLASS[kind]} p-3 text-[12px] leading-relaxed">${html}</div>`;
+
+    const md = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '<strong class="text-fg font-medium">$1</strong>');
+    const fmt = (v: number, d: number) => (Number.isFinite(v) ? v.toFixed(d) : '—');
+
+    // ---------------- render ----------------
+    function render() {
+      if (!result) return;
+      $('notes').innerHTML = result.notes.map((n) => note('warning', n)).join('');
+      if (!result.designs.length) {
+        $('results').classList.add('hidden');
+        $('empty').classList.remove('hidden');
+        $('empty').innerHTML = `<div class="text-sm font-semibold text-warning">Sin soluciones viables</div>
+          <p class="mx-auto mt-1 max-w-md text-[12px] text-muted">Ninguna combinación del catálogo vuela con estas restricciones. Prueba a subir el límite de envergadura o de MTOW, bajar la carga útil o relajar el mínimo de ESC.</p>`;
+        return;
+      }
+      $('results').classList.remove('hidden');
+      const d = result.designs[Math.min(selected, result.designs.length - 1)];
+      renderDesign(d);
+      renderAlternatives();
+      renderCloud();
+    }
+
+    function renderDesign(d: RankedDesign) {
+      const ev = d.evaluation, m = ev.metrics, af = ev.model.airframe.airfoil, pf = ev.model.airframe.planform;
+      const dr = ev.drive;
+
+      $('k-score').textContent = fmt(d.score, 0);
+      $('k-scorelabel').textContent = `de ${d.scoreMax} ${result!.scoreLabel} · ${d.mission.feasible ? 'diseño viable' : 'incumple restricciones'}`;
+      $('k-plane').textContent = af.name;
+      $('k-planesub').textContent = `b=${fmt(m.spanM, 2)} m · AR ${fmt(m.aspectRatio, 1)} · ${fmt(m.mtowKg, 2)} kg${ev.model.airframe.flyingWing ? ' · ala volante' : ''}`;
+      // la "prestación clave" es la métrica del objetivo con más peso
+      const lead = [...objectives].sort((a, b) => b.weight - a.weight)[0];
+      const li = lead ? METRICS[lead.metric] : null;
+      $('k-perf').textContent = li ? `${fmt(m[lead.metric], li.decimals)} ${li.unit}` : '—';
+      $('k-perfsub').textContent = mission.scorer === 'xc27'
+        ? `${li?.label ?? ''} · ${fmt(m.alt60M, 0)} m a 60 s · ${fmt(m.glideDistM, 0)} m de planeo · ${fmt(m.pylonTimeS, 1)} s`
+        : li
+        ? `${li.label} · ${fmt(m.enduranceMin, 0)} min · ${fmt(m.rangeKm, 0)} km · ${fmt(m.cruiseCurrentA, 1)} A`
+        : `${fmt(m.enduranceMin, 0)} min · ${fmt(m.rangeKm, 0)} km`;
+      $('k-space').textContent = result!.space.combos.toLocaleString('es-ES');
+      $('k-spacesub').textContent = `${result!.space.wings} células × ${result!.space.drives} trenes · ${(result!.elapsedMs / 1000).toFixed(1)} s`;
+      $('design-rank').textContent = `#${d.rank} de ${result!.designs.length}`;
+
+      const row = (k: string, v: string) => `<div class="flex justify-between gap-2"><dt class="shrink-0 text-muted">${k}</dt><dd class="truncate text-right font-mono">${v}</dd></div>`;
+      $('rec-power').innerHTML =
+        row('Motor', `${dr.motor.name}`) +
+        row('Kv · masa', `${dr.motor.kv} rpm/V · ${dr.motor.massG} g`) +
+        row('Hélice', `${dr.prop.dia}×${dr.prop.pitch}" ${dr.prop.folding ? 'plegable' : ''}`) +
+        row('Batería', dr.pack.label) +
+        row('Energía · masa', `${fmt(packWh(dr.pack), 0)} Wh · ${fmt(dr.pack.massG, 0)} g`) +
+        row('ESC', `${dr.esc.name} (${dr.esc.iMax} A)`) +
+        row('Gas en crucero', `${fmt(ev.cruise.throttle * 100, 0)} %`) +
+        row('Corriente / límite', `${fmt(m.cruiseCurrentA, 1)} / ${Math.min(dr.motor.iMax, dr.esc.iMax)} A`) +
+        row('Empuje estático', `T/W ${fmt(m.thrustWeight, 2)}`);
+
+      $('rec-airframe').innerHTML =
+        row('Perfil', af.name) +
+        row('Espesor · curvatura', `${(af.tc * 100).toFixed(1)} % · ${af.camberPct} %`) +
+        row('CLmáx de ala', fmt(ev.model.clMaxWing, 2)) +
+        row('Entrada en pérdida', af.stall) +
+        row('Envergadura · AR', `${fmt(pf.spanM, 2)} m · ${fmt(pf.aspectRatio, 1)}`) +
+        row('Superficie · cuerda', `${fmt(ev.model.S, 3)} m² · ${fmt(ev.model.macLen, 3)} m`) +
+        row('Estrechamiento · torsión', `${pf.taper} · ${pf.washoutDeg}°`) +
+        row('Carga alar', `${fmt(m.wingLoadingGm2, 0)} g/m²`) +
+        row('e · CD₀ · (L/D)máx', `${fmt(ev.model.e, 3)} · ${fmt(m.cd0, 4)} · ${fmt(m.ldMax, 1)}`);
+      drawPlanform(pf.spanM, rootChordOf(pf), pf.taper);
+
+      const items = dr.avionics.items;
+      $('rec-avionics').innerHTML = items.map((a) => `
+        <div class="flex items-baseline justify-between gap-2 border-b border-border/60 pb-1">
+          <span class="truncate text-muted" title="${a.note}">${a.name}</span>
+          <span class="shrink-0 font-mono text-[11px] text-subtle">${a.massG} g · ${a.powerW} W</span>
+        </div>`).join('') +
+        `<div class="flex justify-between pt-1.5 text-[12px] font-medium"><span>Total</span>
+          <span class="font-mono">${dr.avionics.massG} g · ${fmt(dr.avionics.powerW, 1)} W</span></div>
+         <div class="mt-1 text-[11px] leading-relaxed text-subtle">${readVars().auxBattery
+           ? 'Alimentada por batería auxiliar: no drena el pack principal.'
+           : `Carga hotel de ${fmt(ev.cruise.avionicsA, 2)} A (${fmt((ev.cruise.avionicsA / Math.max(0.01, m.cruiseCurrentA)) * 100, 0)} % del consumo).`}
+           ${fmt(m.costUsd, 0)} USD de componentes.</div>`;
+
+      renderMasses(ev.masses);
+      renderPerf(m, ev);
+      renderScore(d);
+      renderConstraints(d);
+      $('why-list').innerHTML = d.why.map((w) => `<li class="flex gap-2"><span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-accent"></span><span>${md(w)}</span></li>`).join('');
+      renderSensitivity();
+    }
+
+    function renderMasses(ms: any) {
+      const parts: [string, number, string][] = [
+        ['Ala', ms.wingG, 'bg-accent'], ['Fus./cola', ms.fuseTailG, 'bg-cyan'],
+        ['Batería', ms.batteryG, 'bg-success'], ['Carga útil', ms.payloadG, 'bg-warning'],
+        ['Propulsión', ms.motorG + ms.propG + ms.escG, 'bg-danger'],
+        ['Aviónica', ms.avionicsG, 'bg-subtle'], ['Varios', ms.miscG, 'bg-border'],
+      ];
+      if (ms.fixedG > 0) parts.push(['Caja telemetría', ms.fixedG, 'bg-muted']);
+      const tot = ms.mtowG || 1;
+      $('mass-bar').innerHTML = parts.map(([, g, c]) => `<div class="${c}" style="width:${(g / tot) * 100}%"></div>`).join('');
+      $('mass-legend').innerHTML = parts.map(([n, g, c]) =>
+        `<span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-sm ${c}"></span>${n} <span class="font-mono text-subtle">${g.toFixed(0)} g</span></span>`).join('') +
+        `<span class="ml-auto font-mono font-medium">MTOW ${(tot / 1000).toFixed(2)} kg</span>`;
+    }
+
+    const PERF_KEYS = [
+      'mtowKg', 'payloadG', 'payloadFrac', 'wingLoadingGm2',
+      'cruiseSpeedMs', 'stallSpeedMs', 'maxSpeedMs', 'rocMs',
+      'enduranceMin', 'rangeKm', 'whPerKm', 'cruiseCurrentA',
+      'ldCruise', 'ldMax', 'takeoffRunM', 'cRateUsed',
+    ] as const;
+
+    // la ronda XC27 no tiene crucero: se enseñan sus fases
+    const PERF_KEYS_XC27 = [
+      'mtowKg', 'payloadG', 'emptyKg', 'wingLoadingGm2',
+      'takeoffRunM', 'takeoffMarkM', 'alt60M', 'rocMs',
+      'glideDistM', 'glideRatio', 'glideSpeedMs', 'stallSpeedMs',
+      'pylonTimeS', 'pylonSpeedMs', 'maxSpeedMs', 'thrustWeight',
+      'fullCurrentA', 'missionMah', 'batteryMarginPct', 'boxSumMm',
+    ] as const;
+
+    function renderPerf(m: any, ev: any) {
+      const keys: readonly (keyof typeof METRICS)[] = mission.scorer === 'xc27' ? PERF_KEYS_XC27 : PERF_KEYS;
+      $('perf-grid').innerHTML = keys.map((k) => {
+        const info = METRICS[k];
+        const v = k === 'takeoffRunM' && m[k] === 0 ? 'a mano'
+          : k === 'takeoffMarkM' && m[k] > 60 ? 'fuera' : fmt(m[k], info.decimals);
+        return `<div class="bg-surface p-3" title="${info.help}">
+          <div class="text-[10px] uppercase tracking-wide text-subtle">${info.label}</div>
+          <div class="mt-0.5 font-mono text-[15px] font-medium tabular">${v}<span class="ml-1 text-[10px] font-normal text-subtle">${info.unit}</span></div>
+        </div>`;
+      }).join('') + `<div class="bg-surface p-3">
+          <div class="text-[10px] uppercase tracking-wide text-subtle">Margen de pérdida</div>
+          <div class="mt-0.5 font-mono text-[15px] font-medium tabular">${fmt(m.stallMarginPct, 0)}<span class="ml-1 text-[10px] font-normal text-subtle">%</span></div>
+        </div>`;
+    }
+
+    function renderScore(d: RankedDesign) {
+      // En misiones de reglamento la puntuación que cuenta es la fórmula
+      // oficial; los objetivos ponderados quedan como lectura auxiliar.
+      const official = mission.scorer !== 'generic';
+      $('score-title').textContent = official ? 'Puntuación oficial del reglamento' : 'Desglose de puntuación';
+      $('score-subtitle').classList.toggle('hidden', !official);
+      $('score-subtitle').textContent = 'Objetivos ponderados (lectura auxiliar sobre 1000, no puntúan en la competición)';
+
+      $('score-bars').innerHTML = d.mission.objectives.map((o) => {
+        const pct = o.maxPoints > 0 ? (o.points / o.maxPoints) * 100 : 0;
+        const info = METRICS[o.metric];
+        return `<div class="flex items-center gap-3 px-4 py-2.5">
+          <div class="w-32 shrink-0 truncate text-muted" title="${info.help}">${o.label}</div>
+          <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-surface2"><div class="h-full rounded-full bg-accent" style="width:${pct}%"></div></div>
+          <div class="w-24 shrink-0 text-right font-mono text-[11px] tabular text-subtle">${fmt(o.raw, info.decimals)} ${info.unit}</div>
+          <div class="w-20 shrink-0 text-right font-mono tabular">${fmt(o.points, 0)}<span class="text-[10px] text-subtle">/${fmt(o.maxPoints, 0)}</span></div>
+        </div>`;
+      }).join('') + (d.mission.penalty < 0.999
+        ? `<div class="px-4 py-2 text-[11px] text-warning">Penalización por restricciones blandas: ×${d.mission.penalty.toFixed(3)}</div>` : '');
+
+      const box = $('xc-breakdown');
+      if (d.xcEfficient) {
+        const r = d.xcEfficient.result;
+        box.classList.remove('hidden');
+        box.innerHTML = `<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-subtle">Fórmula oficial §9.9.1 con las métricas simuladas</div>
+          <div class="grid grid-cols-2 gap-1.5 text-[12px] sm:grid-cols-4">
+            ${xcCell('P_peso', r.pPeso, 100)}${xcCell('P_dist', r.pDist, 75)}${xcCell('P_corr', r.pCorr, 75)}${xcCell('B_carga', r.bCarga, 50)}
+          </div>
+          <div class="mt-2 font-mono text-[11px] leading-relaxed text-subtle">
+            agua ${d.xcEfficient.waterG.toFixed(0)} g + comida ${d.xcEfficient.foodG.toFixed(0)} g · t_carga ${d.xcEfficient.loadTimeS.toFixed(1)} s ·
+            ×B_desp ${r.bDespegue} ×S_piloto ${r.sPiloto} ×S_rep ${r.sRepuestos} → <span class="text-fg">${r.total.toFixed(1)} pts</span>
+          </div>`;
+      } else if (d.xc27) {
+        const r = d.xc27.result, i = d.xc27.input;
+        const f3 = (v: number) => v.toFixed(3).replace(/0$/, '');
+        box.classList.remove('hidden');
+        box.innerHTML = `<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-subtle">Fórmula oficial §9.5 con las métricas simuladas</div>
+          <div class="grid grid-cols-2 gap-1.5 text-[12px] sm:grid-cols-4">
+            ${x27Cell('P_AS · altitud', r.pAS.toFixed(1), `${i.alt60M.toFixed(0)} m a los 60 s`)}
+            ${x27Cell('P_CA · carga', r.pCA.toFixed(4), `${i.declaredKg.toFixed(2)} kg declarados`)}
+            ${x27Cell('P_VE · planeo', r.pVE.toFixed(2), `${i.glideDistM.toFixed(0)} m sin motor`)}
+            ${x27Cell('P_PI · pilones', r.pPI.toFixed(2), i.pylonTimeS > 0 ? `${i.pylonTimeS.toFixed(1)} s` : 'sin tiempo')}
+          </div>
+          <div class="mt-2 font-mono text-[11px] leading-relaxed text-subtle">
+            (${r.pAS.toFixed(1)} · ${r.pCA.toFixed(4)} · ${r.pVE.toFixed(2)} + ${r.pPI.toFixed(2)})
+            ×B_pred ${r.bPrediccion} ×B_desp ${r.bDespegue} (${i.takeoff === 'foul' ? 'fuera de pista' : i.takeoff + ' m'})
+            ×B_carga ${f3(r.bCarga)} (T_CD ${i.loadUnloadS.toFixed(0)} s) ×S_piloto ${r.sPiloto}
+            = P_equipo <span class="text-fg">${r.pEquipo.toFixed(2)}</span>
+            → <span class="text-fg">${d.xc27.points.toFixed(0)} pts</span> de 750${d.xc27.pointsRaw > 750.5 ? ' (satura: bate la referencia)' : ''}
+          </div>
+          <div class="mt-1.5 text-[11px] leading-relaxed text-subtle">
+            El bloque de carga · ascenso · planeo aporta ${(100 * r.efficient / Math.max(1e-9, r.efficient + r.pPI)).toFixed(0)} % y los pilones el resto.
+          </div>`;
+      } else if (d.xcUrgent) {
+        const r = d.xcUrgent.result;
+        box.classList.remove('hidden');
+        box.innerHTML = `<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-subtle">Fórmula oficial §9.9.2 con las métricas simuladas</div>
+          <div class="grid grid-cols-2 gap-1.5 text-[12px]">${xcCell('P_tiempo', r.pTiempo, 300)}
+            <div class="rounded-lg bg-surface2 p-2"><div class="text-[10px] text-subtle">Circuito 1.2 km</div><div class="font-mono">${d.evaluation.metrics.lapTimeS.toFixed(1)} s</div></div>
+          </div>
+          <div class="mt-2 font-mono text-[11px] text-subtle">×B_aterrizaje ${r.bAterrizaje} ×S_piloto ${r.sPiloto} ×S_rep ${r.sRepuestos} → <span class="text-fg">${r.total.toFixed(1)} pts</span></div>`;
+      } else box.classList.add('hidden');
+    }
+
+    const x27Cell = (k: string, v: string, sub: string) =>
+      `<div class="rounded-lg bg-surface2 p-2"><div class="text-[10px] text-subtle">${k}</div>
+        <div class="font-mono">${v}</div><div class="text-[10px] text-subtle">${sub}</div></div>`;
+
+    const xcCell = (k: string, v: number, max: number) =>
+      `<div class="rounded-lg bg-surface2 p-2"><div class="text-[10px] text-subtle">${k}</div>
+        <div class="font-mono ${v >= max - 0.05 ? 'text-warning' : ''}">${v.toFixed(1)}<span class="text-[10px] text-subtle">/${max}</span></div></div>`;
+
+    function renderConstraints(d: RankedDesign) {
+      const list = d.mission.constraints;
+      $('constraint-list').innerHTML = list.length ? list.map((c) => {
+        const info = METRICS[c.metric];
+        const tone = c.ok ? 'text-success' : c.hard ? 'text-danger' : 'text-warning';
+        const icon = c.ok
+          ? '<path d="M20 6 9 17l-5-5"/>'
+          : '<path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>';
+        return `<div class="flex items-center gap-2.5 px-4 py-2.5">
+          <svg class="shrink-0 ${tone}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg>
+          <div class="min-w-0 flex-1"><div class="truncate">${c.label}</div>
+            <div class="text-[10px] text-subtle">${info.label} ${c.op} ${c.limit} ${info.unit}${c.hard ? '' : ' · penaliza, no descalifica'}</div></div>
+          <div class="shrink-0 font-mono text-[12px] ${tone}">${fmt(c.value, info.decimals)}</div>
+        </div>`;
+      }).join('') : '<div class="px-4 py-3 text-[12px] text-subtle">Esta misión no define restricciones duras.</div>';
+
+      if (!d.evaluation.feasible && d.evaluation.reasons.length) {
+        $('constraint-list').innerHTML += d.evaluation.reasons.map((r) =>
+          `<div class="px-4 py-2.5 text-[11px] leading-relaxed text-danger">${r}</div>`).join('');
+      }
+    }
+
+    function renderSensitivity() {
+      const items = result!.sensitivity;
+      if (!items.length) { $('sens-list').innerHTML = '<div class="text-[12px] text-subtle">Sin datos de sensibilidad.</div>'; return; }
+      const max = Math.max(...items.map((i) => Math.abs(i.delta)), 0.001);
+      $('sens-list').innerHTML = items.map((i) => `<div class="flex items-center gap-3">
+        <div class="w-40 shrink-0 truncate text-[12px]" title="${i.hint}">${i.label}</div>
+        <div class="h-2 flex-1 overflow-hidden rounded-full bg-surface2">
+          <div class="h-full rounded-full ${i.delta >= 0 ? 'bg-success' : 'bg-danger'}" style="width:${(Math.abs(i.delta) / max) * 100}%"></div></div>
+        <div class="w-16 shrink-0 text-right font-mono text-[12px] tabular ${i.delta >= 0 ? 'text-success' : 'text-danger'}">${i.delta >= 0 ? '+' : ''}${i.delta.toFixed(1)}</div>
+        <div class="hidden w-40 shrink-0 truncate text-[11px] text-subtle lg:block">${i.hint}</div>
+      </div>`).join('');
+    }
+
+    function renderAlternatives() {
+      $('alt-h1').textContent = mission.scorer === 'xc27' ? 'Carga' : 'Autonomía';
+      $('alt-h2').textContent = mission.scorer === 'xc27' ? 'Pilones' : 'V crucero';
+      $('alt-table').innerHTML = result!.designs.map((d, i) => {
+        const ev = d.evaluation, m = ev.metrics, pf = ev.model.airframe.planform;
+        return `<tr data-alt="${i}" class="cursor-pointer transition hover:bg-surface2 ${i === selected ? 'bg-surface2' : ''}">
+          <td class="px-4 py-2 font-mono text-subtle">${d.rank}</td>
+          <td class="px-3 py-2">${ev.model.airframe.airfoil.name}${ev.model.airframe.flyingWing ? ' <span class="badge !py-0 !text-[9px]">ala volante</span>' : ''}</td>
+          <td class="px-3 py-2 font-mono text-[11px] text-muted">b ${fmt(pf.spanM, 2)} · AR ${fmt(pf.aspectRatio, 1)}</td>
+          <td class="px-3 py-2 font-mono text-[11px] text-muted">${ev.drive.prop.dia}×${ev.drive.prop.pitch}" · ${ev.drive.pack.label}</td>
+          <td class="px-3 py-2 text-right font-mono tabular">${fmt(m.mtowKg, 2)}</td>
+          <td class="px-3 py-2 text-right font-mono tabular">${mission.scorer === 'xc27' ? fmt(m.payloadG, 0) + ' g' : fmt(m.enduranceMin, 0) + ' min'}</td>
+          <td class="px-3 py-2 text-right font-mono tabular">${mission.scorer === 'xc27' ? fmt(m.pylonTimeS, 1) + ' s' : fmt(m.cruiseSpeedMs, 1)}</td>
+          <td class="px-4 py-2 text-right font-mono font-medium tabular ${d.mission.feasible ? '' : 'text-danger'}">${fmt(d.score, 0)}</td>
+        </tr>`;
+      }).join('');
+      $('alt-table').querySelectorAll<HTMLElement>('tr[data-alt]').forEach((tr) => {
+        tr.addEventListener('click', () => {
+          selected = parseInt(tr.dataset.alt!, 10);
+          renderDesign(result!.designs[selected]);
+          renderAlternatives();
+        });
+      });
+    }
+
+    // ---------------- gráficos ----------------
+    const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+    const rgb = (v: string) => `rgb(${css(v)})`;
+
+    function drawPlanform(span: number, rootChord: number, taper: number) {
+      const s = span / 2, cr = rootChord, ct = cr * taper;
+      const W = 300, H = 110, pad = 8;
+      const sc = Math.min((W - 2 * pad) / span, (H - 2 * pad) / cr);
+      const cx = W / 2;
+      const X = (y: number) => cx + y * sc;
+      const Y = (x: number) => pad + x * sc;
+      const pts = [[X(0), Y(0)], [X(s), Y(0)], [X(s), Y(ct)], [X(0), Y(cr)], [X(-s), Y(ct)], [X(-s), Y(0)]];
+      $('planform-svg').innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="w-full">
+        <polygon points="${pts.map((p) => p.join(',')).join(' ')}" fill="rgb(${css('--accent')} / 0.18)" stroke="rgb(${css('--accent')})" stroke-width="1.4"/>
+        <line x1="${cx}" y1="2" x2="${cx}" y2="${H - 2}" stroke="rgb(${css('--border')})" stroke-dasharray="3 3"/></svg>`;
+    }
+
+    function renderCloud() {
+      const P = (window as any).Plotly;
+      if (!P || !result) return;
+      const ok = result.cloud.filter((c) => c.feasible), ko = result.cloud.filter((c) => !c.feasible);
+      const win = result.designs[selected]?.evaluation.metrics;
+      const grid = `rgba(${css('--border')}, 0.6)`;
+      P.react('cloud', [
+        { x: ko.map((c) => c.x), y: ko.map((c) => c.y), mode: 'markers', name: 'no viable', type: 'scattergl',
+          marker: { size: 3, color: rgb('--subtle'), opacity: 0.25 }, hoverinfo: 'skip' },
+        { x: ok.map((c) => c.x), y: ok.map((c) => c.y), mode: 'markers', name: 'viable', type: 'scattergl',
+          marker: { size: 4, color: rgb('--accent'), opacity: 0.5 },
+          hovertemplate: 'MTOW %{x:.2f} kg<br>%{y:.0f} pts<extra></extra>' },
+        ...(win ? [{ x: [win.mtowKg], y: [result.designs[selected].score], mode: 'markers', name: 'seleccionado', type: 'scatter',
+          marker: { size: 13, color: rgb('--success'), symbol: 'star', line: { width: 1, color: rgb('--bg') } } }] : []),
+      ], {
+        paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+        font: { family: 'JetBrains Mono, monospace', size: 10, color: rgb('--muted') },
+        margin: { l: 48, r: 16, t: 8, b: 36 },
+        legend: { orientation: 'h', y: 1.16, x: 0, font: { size: 9 } },
+        xaxis: { title: 'MTOW (kg)', gridcolor: grid, zeroline: false, linecolor: grid },
+        yaxis: { title: result.scoreLabel, gridcolor: grid, zeroline: false, linecolor: grid },
+      }, { displaylogo: false, responsive: true, modeBarButtonsToRemove: ['lasso2d', 'select2d'] });
+    }
+
+    // ---------------- exportación ----------------
+    const download = (name: string, data: string, type: string) => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([data], { type }));
+      a.download = name; a.click(); URL.revokeObjectURL(a.href);
+    };
+
+    function exportJson() {
+      if (!result?.designs.length) return;
+      const d = result.designs[selected], ev = d.evaluation;
+      download('uav-mission-design.json', JSON.stringify({
+        schema: 'uav-suite/mission-design@1',
+        mission: { id: mission.id, name: mission.name, scorer: mission.scorer },
+        variables: readVars(),
+        objectives,
+        score: { value: d.score, max: d.scoreMax, label: result.scoreLabel, feasible: d.mission.feasible },
+        airframe: {
+          airfoil: ev.model.airframe.airfoil,
+          planform: ev.model.airframe.planform,
+          flyingWing: ev.model.airframe.flyingWing,
+          wingAreaM2: ev.model.S, macM: ev.model.macLen, spanEfficiency: ev.model.e, clMaxWing: ev.model.clMaxWing,
+        },
+        powertrain: {
+          motor: ev.drive.motor, prop: ev.drive.prop, esc: ev.drive.esc,
+          pack: { label: ev.drive.pack.label, cells: ev.drive.pack.cells, capacityMah: ev.drive.pack.capacityMah, massG: ev.drive.pack.massG, wh: packWh(ev.drive.pack) },
+          cruiseThrottle: ev.cruise.throttle,
+        },
+        avionics: ev.drive.avionics,
+        masses: ev.masses,
+        metrics: ev.metrics,
+        constraints: d.mission.constraints,
+        xc27: d.xc27 ? { strategy: readStrategy(), input: d.xc27.input, result: d.xc27.result, points: d.xc27.points } : undefined,
+        sensitivity: result.sensitivity,
+      }, null, 2), 'application/json');
+    }
+
+    function exportCsv() {
+      if (!result?.designs.length) return;
+      const keys = Object.keys(result.designs[0].evaluation.metrics);
+      let csv = ['rank', 'score', 'feasible', 'airfoil', 'span_m', 'aspect_ratio', 'motor', 'prop', 'pack', 'esc', ...keys].join(',') + '\n';
+      for (const d of result.designs) {
+        const ev = d.evaluation, m = ev.metrics as any;
+        csv += [
+          d.rank, d.score.toFixed(2), d.mission.feasible, `"${ev.model.airframe.airfoil.name}"`,
+          ev.model.airframe.planform.spanM.toFixed(3), ev.model.airframe.planform.aspectRatio.toFixed(2),
+          `"${ev.drive.motor.name}"`, `"${ev.drive.prop.dia}x${ev.drive.prop.pitch}"`, `"${ev.drive.pack.label}"`, `"${ev.drive.esc.name}"`,
+          ...keys.map((k) => (Number.isFinite(m[k]) ? m[k].toFixed(4) : '')),
+        ].join(',') + '\n';
+      }
+      download('uav-mission-ranking.csv', csv, 'text/csv');
+    }
+
+    // Pasa el diseño seleccionado al estudio de avión XC27.
+    function openStudy() {
+      if (!result?.designs.length) { location.href = '/xc27-avion'; return; }
+      const d = result.designs[selected];
+      const vars = readVars();
+      try {
+        localStorage.setItem('xc27-aircraft', JSON.stringify({
+          spec: specFromEvaluation(d.evaluation, vars, rhoOf(vars)), strategy: readStrategy(),
+        }));
+      } catch { /* almacenamiento no disponible: se abre con los valores por defecto */ }
+      location.href = '/xc27-avion';
+    }
+
+    // ---------------- arranque ----------------
+    $('sel-mission').addEventListener('change', (e) => loadMission((e.target as HTMLSelectElement).value));
+    $('btn-run').addEventListener('click', run);
+    $('btn-json').addEventListener('click', exportJson);
+    $('btn-csv').addEventListener('click', exportCsv);
+    $('btn-study').addEventListener('click', openStudy);
+    window.addEventListener('themechange', () => { if (result) renderCloud(); });
+
+    setVal('xc-plmax', XC_DEFAULT_REFS.plMaxG); setVal('xc-distmax', XC_DEFAULT_REFS.distanceMaxM);
+    setVal('xc-currmin', XC_DEFAULT_REFS.currentMinA); setVal('xc-ctmax', XC_DEFAULT_REFS.loadCoeffMax);
+    setVal('xc-timemin', XC_DEFAULT_REFS.timeMinS); setVal('xc-waterfrac', XC_DEFAULT_ASSUMPTIONS.waterFrac);
+    setVal('xc-loadbase', XC_DEFAULT_ASSUMPTIONS.loadBaseS); setVal('xc-loadrate', XC_DEFAULT_ASSUMPTIONS.loadRateGs);
+    {
+      const s = XC27_DEFAULT_STRATEGY;
+      setVal('x27-pmax', s.pMaxRef); setVal('x27-unit', s.payloadUnit); setVal('x27-ceiling', s.altCeilingM);
+      setVal('x27-glideend', s.glideEndAltM); setVal('x27-climbeff', s.climbEfficiency); setVal('x27-glidef', s.glidePathFactor);
+      setVal('x27-tomargin', s.takeoffMargin); setVal('x27-maxg', s.pylonMaxG); setVal('x27-loadbase', s.loadBaseS);
+      setVal('x27-loadrate', s.loadRateGs); setVal('x27-carry', s.carryFraction);
+    }
+    loadMission(MISSION_TYPES[0].id);
+    // enlace directo que lanza la optimización: /competition#run
+    if (location.hash === '#run') run();
+  </script>
+</AppShell>

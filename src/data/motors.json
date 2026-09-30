@@ -1,0 +1,80 @@
+[
+ {
+  "id": "emax-gt2826-1090kv",
+  "name": "Emax GT2826/04 1090KV",
+  "brand": "Emax",
+  "kv": 1090.0,
+  "rm": 0.024,
+  "i0Ref": 2.4,
+  "vRef": 11.1,
+  "inertia": 5e-05,
+  "massG": 175,
+  "iMax": 40.0,
+  "note": "Motor obligatorio XtraChallenge 2026."
+ },
+ {
+  "id": "emax-gt2820-985kv",
+  "name": "Emax GT2820/06 985KV",
+  "brand": "Emax",
+  "kv": 985.0,
+  "rm": 0.041,
+  "i0Ref": 1.7,
+  "vRef": 10.0,
+  "inertia": 4e-05,
+  "massG": 140,
+  "iMax": 57.0,
+  "note": "Motor OBLIGATORIO XtraChallenge 2027 (§7.6). Masa y corriente máx. de catálogo (140 g, 57 A, 848 W); Rm e I0 estimados: calíbralos con un ensayo en banco."
+ },
+ {
+  "id": "generic-800kv",
+  "name": "Generic 800Kv",
+  "brand": "Generic",
+  "kv": 800.0,
+  "rm": 0.08,
+  "i0Ref": 0.5,
+  "vRef": 11.1,
+  "inertia": 1e-05,
+  "massG": 45,
+  "iMax": 30.0,
+  "note": ""
+ },
+ {
+  "id": "t-motor-at2814-900kv",
+  "name": "T-Motor AT2814 900KV",
+  "brand": "T-Motor",
+  "kv": 900.0,
+  "rm": 0.082,
+  "i0Ref": 1.2,
+  "vRef": 10.0,
+  "inertia": 5e-05,
+  "massG": 65,
+  "iMax": 45.0,
+  "note": ""
+ },
+ {
+  "id": "t-motor-at2826-900kv",
+  "name": "T-Motor AT2826 900KV",
+  "brand": "T-Motor",
+  "kv": 900.0,
+  "rm": 0.024,
+  "i0Ref": 2.2,
+  "vRef": 10.0,
+  "inertia": 5e-05,
+  "massG": 175,
+  "iMax": 57.0,
+  "note": ""
+ },
+ {
+  "id": "turnigy-1400kv",
+  "name": "Turnigy 1400Kv",
+  "brand": "Turnigy",
+  "kv": 1400.0,
+  "rm": 0.05,
+  "i0Ref": 0.4,
+  "vRef": 11.1,
+  "inertia": 8e-06,
+  "massG": 38,
+  "iMax": 25.0,
+  "note": ""
+ }
+]

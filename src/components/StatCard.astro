@@ -1,0 +1,20 @@
+---
+interface Props {
+  label: string;
+  value: string;
+  unit?: string;
+  delta?: string;
+  trend?: 'up' | 'down' | 'flat';
+  accent?: boolean;
+}
+const { label, value, unit, delta, trend = 'flat', accent = false } = Astro.props;
+const trendColor = trend === 'up' ? 'text-success' : trend === 'down' ? 'text-danger' : 'text-subtle';
+---
+<div class={`card p-4 ${accent ? 'ring-1 ring-accent/30' : ''}`}>
+  <div class="text-[11px] font-medium uppercase tracking-wide text-subtle">{label}</div>
+  <div class="mt-2 flex items-baseline gap-1.5">
+    <span class="font-mono text-2xl font-semibold tabular tracking-tight">{value}</span>
+    {unit && <span class="text-xs text-muted">{unit}</span>}
+  </div>
+  {delta && <div class={`mt-1.5 text-[11px] font-medium ${trendColor}`}>{delta}</div>}
+</div>

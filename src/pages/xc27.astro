@@ -1,0 +1,826 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+import {
+  XC27_LIMITS, XC27_PHASES, XC27_OPEN_QUESTIONS, XC27_DEADLINES, XC27_STATIC, XC27_DRAWING_DIMS,
+  XC27_FIELD, ALT_SCORE_PEAK_M, GLIDE_UNIT_DIST_M,
+} from '../lib/xc27';
+
+const L = XC27_LIMITS;
+const limits: [string, string, string][] = [
+  ['Motor', L.motorName, '§7.6 · único, sin modificar'],
+  ['Hélice', 'Libre, una sola', '§7.6 · debe figurar en el informe'],
+  ['ESC', `≥ ${L.escMinA} A continuos`, '§7.6 · comercial'],
+  ['Batería principal', `LiPo ≤ ${L.maxCells}S · ${L.maxVoltage} V`, '§7.6 · XT60 · paralelo permitido'],
+  ['Batería auxiliar', `independiente · ≥ ${L.auxBatteryMinMah} mAh`, '§7.6 · receptor y servos'],
+  ['Radio', '2.4 GHz · sin GPS, waypoints ni FPV', '§7.7 · estabilización sí'],
+  ['Caja de telemetría', `${L.telemetryBox.lengthMm}×${L.telemetryBox.widthMm}×${L.telemetryBox.heightMm} mm · ${L.telemetryBox.massG} g`, '§7.7.1 · 2 × M3 desde arriba'],
+  ['Carga de pago', `arroz a granel · ${L.riceDensityKgL} kg/L`, `§7.8 · bahía ≥ ${L.minPayloadG} g, cerrada`],
+  ['Caja de transporte', `alto + ancho + largo ≤ ${L.boxSumMm} mm`, '§7.3 · dimensiones internas'],
+  ['Presupuesto', `≤ ${L.budgetEur} €`, '§7.2 · PVP, moldes incluidos'],
+  ['MTOW', `≤ ${L.mtowMaxKg} kg`, '§7.8 · límite legal'],
+  ['Pista', `${L.runwayM} × ${L.runwayWidthM} m de asfalto`, '§8.6 · marcas a 20, 40 y 60 m'],
+  ['Altura de vuelo', `${L.altMinM}–${L.altMaxM} m`, '§8.6 · planeo y pilones'],
+  ['Viento', `se para con > ${L.windMaxMs} m/s`, '§8.7 · media de 20 s a 2 m'],
+];
+
+const programme: [string, string][] = [
+  ['Lun 5 jul', 'Llegada · check-in 15:00–21:00'],
+  ['Mar 6 jul', 'Día técnico en la UPV: inspección de cajas 8:45, montaje 9:30, inspecciones técnicas y presentaciones'],
+  ['Mié 7 jul', 'Casinos: vuelos de prueba 8:45–13:30 · Ronda 1 de 14:00 a 19:00'],
+  ['Jue 8 jul', 'Ronda 2 de 8:45 a 13:30 · Ronda 3 de 14:00 a 19:00'],
+  ['Vie 9 jul', 'Ronda 4 de 8:45 a 14:00 · exhibición · cena y entrega de premios 20:30'],
+];
+
+const tabs = [
+  ['resumen', 'Reglamento'],
+  ['ronda', 'Calculadora de ronda'],
+  ['estaticas', 'Estáticas y total'],
+  ['conformidad', 'Conformidad'],
+  ['presupuesto', 'Presupuesto'],
+  ['calendario', 'Calendario'],
+];
+---
+<AppShell title="XtraChallenge 2027" subtitle="Reglamento XC_27 v1.00 · puntuación, conformidad, presupuesto y calendario">
+  <script is:inline src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <span class="badge mb-2"><span class="h-1.5 w-1.5 rounded-full bg-success"></span> V edición · València · 6–9 de julio de 2027</span>
+      <h1 class="text-xl font-semibold tracking-tight">XtraChallenge 2027</h1>
+      <p class="max-w-2xl text-[13px] text-muted">
+        Todo lo que el reglamento técnico pide al avión y al equipo, convertido en números:
+        la fórmula de la ronda, los 250 puntos estáticos, la inspección técnica, los 450 € y las fechas.
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href="/xc27-avion" class="btn btn-primary">Estudiar el avión</a>
+      <a href="/competition" class="btn">Optimizar diseño</a>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div class="card p-4 ring-1 ring-accent/30">
+      <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Puntuación estimada</div>
+      <div class="mt-1 font-mono text-2xl font-semibold tabular"><span id="k-total">—</span><span class="text-xs text-subtle"> / 1000</span></div>
+      <div class="text-[11px] text-subtle" id="k-total-sub">—</div>
+    </div>
+    <div class="card p-4">
+      <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Próxima fecha</div>
+      <div class="mt-1 font-mono text-2xl font-semibold tabular" id="k-next">—</div>
+      <div class="truncate text-[11px] text-subtle" id="k-next-sub">—</div>
+    </div>
+    <div class="card p-4">
+      <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Conformidad</div>
+      <div class="mt-1 font-mono text-2xl font-semibold tabular" id="k-check">—</div>
+      <div class="text-[11px] text-subtle">requisitos de inspección verificados</div>
+    </div>
+    <div class="card p-4">
+      <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Presupuesto</div>
+      <div class="mt-1 font-mono text-2xl font-semibold tabular"><span id="k-budget">—</span><span class="text-xs text-subtle"> / {L.budgetEur} €</span></div>
+      <div class="text-[11px]" id="k-budget-sub">—</div>
+    </div>
+  </div>
+
+  <!-- Pestañas -->
+  <div class="mb-5 flex gap-1 overflow-x-auto border-b border-border" role="tablist">
+    {tabs.map(([id, label]) => (
+      <button data-tab={id} role="tab" class="tab-btn whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-[13px] font-medium text-muted transition hover:text-fg">{label}</button>
+    ))}
+  </div>
+
+  <!-- ==================== REGLAMENTO ==================== -->
+  <section data-panel="resumen" class="space-y-5">
+    <div class="card overflow-hidden">
+      <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">La ronda de vuelo, fase a fase <span class="font-normal text-subtle">— §8.6</span></div>
+      <div class="flex gap-2 overflow-x-auto p-4">
+        {XC27_PHASES.map((p, i) => (
+          <div class="w-44 shrink-0 rounded-lg border border-border bg-surface2 p-3">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-[10px] text-subtle">{String(i + 1).padStart(2, '0')}</span>
+              <span class={`badge !py-0 !text-[10px] ${p.scored !== '—' ? '!border-accent/40 !text-accent' : ''}`}>{p.scored}</span>
+            </div>
+            <div class="mt-1.5 text-[13px] font-semibold">{p.label}</div>
+            <div class="font-mono text-[11px] text-muted">{p.limit}</div>
+            <p class="mt-1.5 text-[11px] leading-relaxed text-subtle">{p.detail}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div class="grid gap-5 lg:grid-cols-2">
+      <div class="card overflow-hidden">
+        <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Fórmula de la ronda <span class="font-normal text-subtle">— §9.5</span></div>
+        <div class="space-y-3 p-4 text-[12px]">
+          <div class="overflow-x-auto rounded-lg bg-surface2 p-3 font-mono text-[12px] leading-relaxed">
+            P<sub>equipo</sub> = (P<sub>AS</sub> · P<sub>CA</sub> · P<sub>VE</sub> + P<sub>PI</sub>) · B<sub>pred</sub> · B<sub>desp</sub> · B<sub>carga</sub> · S<sub>piloto</sub> · L<sub>vuelo</sub><br />
+            P<sub>ronda</sub> = 750 · P<sub>equipo</sub> / P<sub>max</sub>
+          </div>
+          <dl class="space-y-2">
+            <div class="flex gap-3"><dt class="w-16 shrink-0 font-mono text-accent">P_AS</dt><dd class="text-muted">Altitud a los 60 s de ascenso. Polinomio de 4º grado: máximo de 100 a {ALT_SCORE_PEAK_M} m, 80 a 120 m.</dd></div>
+            <div class="flex gap-3"><dt class="w-16 shrink-0 font-mono text-accent">P_CA</dt><dd class="text-muted">Carga declarada / 300 (en kg según el texto): 3 kg de arroz valen 0.01.</dd></div>
+            <div class="flex gap-3"><dt class="w-16 shrink-0 font-mono text-accent">P_VE</dt><dd class="text-muted">D<sub>R</sub><sup>√2</sup> / 155². Vale 1 con {GLIDE_UNIT_DIST_M.toFixed(0)} m planeados; duplicar la distancia multiplica por 2.67.</dd></div>
+            <div class="flex gap-3"><dt class="w-16 shrink-0 font-mono text-accent">P_PI</dt><dd class="text-muted">40² / T<sub>PI</sub>². Vale 1 con 40 s en los 10 pilones; con 60 s, 0.44.</dd></div>
+            <div class="flex gap-3"><dt class="w-16 shrink-0 font-mono text-accent">B_pred</dt><dd class="text-muted">Transportada/declarada: ≥ 0.9 → 1 · 0.7–0.9 → 0.8 · 0.5–0.7 → 0.6 · ≤ 0.5 → 0.1.</dd></div>
+            <div class="flex gap-3"><dt class="w-16 shrink-0 font-mono text-accent">B_desp</dt><dd class="text-muted">Despegue en 20 m ×1.25 · 40 m ×1.125 · 60 m ×1 · fuera de pista ×0.</dd></div>
+            <div class="flex gap-3"><dt class="w-16 shrink-0 font-mono text-accent">B_carga</dt><dd class="text-muted">×1.25 si carga + descarga ≤ 35 s; después 1 + 0.25·(1.1 − T<sub>CD</sub> / (120·√M<sub>PL</sub>)).</dd></div>
+            <div class="flex gap-3"><dt class="w-16 shrink-0 font-mono text-accent">S · L</dt><dd class="text-muted">Piloto externo ×0.75 · accidente en la aproximación ×0.5 · vuelo nulo ×0.</dd></div>
+          </dl>
+          <p class="rounded-lg border border-accent/25 bg-accent/5 p-2.5 text-[11px] leading-relaxed text-muted">
+            <strong class="text-fg">Lectura de diseño.</strong> El arroz multiplica a la altitud y al planeo, pero se descarga en el pitstop:
+            el avión sube cargado y corre vacío. Las bonificaciones multiplican a TODA la ronda — 20 m de despegue y un pitstop de 35 s valen ×1.56 juntos.
+          </p>
+        </div>
+      </div>
+
+      <div class="card overflow-hidden">
+        <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Límites técnicos <span class="font-normal text-subtle">— §7 y §8</span></div>
+        <div class="divide-y divide-border text-[12px]">
+          {limits.map(([k, v, ref]) => (
+            <div class="flex items-baseline gap-3 px-4 py-2">
+              <div class="w-32 shrink-0 text-muted">{k}</div>
+              <div class="min-w-0 flex-1 font-mono text-[11px]">{v}</div>
+              <div class="hidden shrink-0 text-right text-[10px] text-subtle sm:block">{ref}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    <div class="grid gap-3 lg:grid-cols-3">
+      <div class="card min-w-0 overflow-hidden p-3"><div class="mb-1 px-1 text-[12px] font-semibold">P_AS frente a la altitud a 60 s</div><div id="c-pas" class="h-56"></div></div>
+      <div class="card min-w-0 overflow-hidden p-3"><div class="mb-1 px-1 text-[12px] font-semibold">P_VE frente a la distancia de planeo</div><div id="c-pve" class="h-56"></div></div>
+      <div class="card min-w-0 overflow-hidden p-3"><div class="mb-1 px-1 text-[12px] font-semibold">P_PI frente al tiempo de pilones</div><div id="c-ppi" class="h-56"></div></div>
+    </div>
+
+    <div class="card overflow-hidden">
+      <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Puntos a confirmar con la organización</div>
+      <div class="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-3">
+        {XC27_OPEN_QUESTIONS.map((q) => (
+          <div class="bg-surface p-4">
+            <div class="text-[12px] font-semibold text-warning">{q.title}</div>
+            <p class="mt-1 text-[11px] leading-relaxed text-muted">{q.text}</p>
+          </div>
+        ))}
+      </div>
+      <div class="border-t border-border px-4 py-2.5 text-[11px] text-subtle">Dudas formales: xtrachallenge2027@gmail.com, con número y nombre de equipo en el asunto (§3).</div>
+    </div>
+  </section>
+
+  <!-- ==================== CALCULADORA DE RONDA ==================== -->
+  <section data-panel="ronda" class="hidden space-y-5">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-[12px] text-muted">Ronda</span>
+      <div id="round-tabs" class="flex gap-1"></div>
+      <label class="ml-2 flex items-center gap-2 text-[12px] text-muted"><input id="r-flown" type="checkbox" class="accent-accent" /> Cuenta en la media</label>
+      <button id="btn-copy-round" class="btn ml-auto !py-1.5 text-[12px]">Copiar a las demás rondas</button>
+      <button id="btn-from-study" class="btn !py-1.5 text-[12px]" title="Trae las cifras simuladas del estudio de avión">Traer del estudio de avión</button>
+    </div>
+
+    <div class="grid gap-5 xl:grid-cols-[360px_1fr]">
+      <aside class="space-y-4">
+        <div class="card p-4">
+          <div class="mb-3 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Lo que mide la telemetría</div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <div><label class="field-label">Altitud a 60 s (m)</label><input id="r-alt" type="number" step="1" class="field" /></div>
+            <div><label class="field-label">Planeo D_R (m)</label><input id="r-glide" type="number" step="10" class="field" /></div>
+            <div class="col-span-2"><label class="field-label">Tiempo de pilones T_PI (s) — 0 si se renuncia</label><input id="r-pylon" type="number" step="0.5" class="field" /></div>
+          </div>
+        </div>
+        <div class="card p-4">
+          <div class="mb-3 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Carga de pago</div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <div><label class="field-label">Declarada en el informe (kg)</label><input id="r-declared" type="number" step="0.05" class="field" /></div>
+            <div><label class="field-label">Transportada y devuelta (kg)</label><input id="r-carried" type="number" step="0.05" class="field" /></div>
+            <div><label class="field-label">Carga + descarga T_CD (s)</label><input id="r-tcd" type="number" step="1" class="field" /></div>
+            <div>
+              <label class="field-label">Unidad de P_CA</label>
+              <select id="r-unit" class="field"><option value="kg">kg (texto §9.5.4)</option><option value="g">gramos</option></select>
+            </div>
+          </div>
+          <label class="mt-2.5 flex items-center gap-2 text-[12px] text-muted"><input id="r-loadlost" type="checkbox" class="accent-accent" /> Bonus de carga perdido (tocar el avión / cierre inseguro)</label>
+        </div>
+        <div class="card p-4">
+          <div class="mb-3 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Ficha prevuelo y validez</div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="field-label">Despegue declarado</label>
+              <select id="r-takeoff" class="field"><option value="20">20 m (×1.25)</option><option value="40">40 m (×1.125)</option><option value="60">60 m (×1)</option><option value="foul">Fuera de pista (×0)</option></select>
+            </div>
+            <div>
+              <label class="field-label">Validez del vuelo</label>
+              <select id="r-legal" class="field"><option value="1">Válido (×1)</option><option value="0.5">Accidente al aterrizar (×0.5)</option><option value="0">Nulo (×0)</option></select>
+            </div>
+            <div class="col-span-2"><label class="field-label" title="P_equipo de la mejor marca de la ronda">P_max de la ronda (mejor P_equipo)</label><input id="r-pmax" type="number" step="0.1" class="field" /></div>
+          </div>
+          <div class="mt-2.5 space-y-1">
+            <label class="flex items-center gap-2 text-[12px] text-muted"><input id="r-extpilot" type="checkbox" class="accent-accent" /> Piloto externo (×0.75)</label>
+            <label class="flex items-center gap-2 text-[12px] text-muted"><input id="r-spares" type="checkbox" class="accent-accent" /> Reparado sin repuestos presentados (×0.75)</label>
+          </div>
+        </div>
+      </aside>
+
+      <div class="space-y-5">
+        <div class="grid gap-3 sm:grid-cols-3">
+          <div class="card p-4 ring-1 ring-accent/30">
+            <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Puntos de la ronda</div>
+            <div class="mt-1 font-mono text-3xl font-semibold tabular" id="r-points">—</div>
+            <div class="text-[11px] text-subtle" id="r-points-sub">de 750</div>
+          </div>
+          <div class="card p-4">
+            <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">P_equipo</div>
+            <div class="mt-1 font-mono text-3xl font-semibold tabular" id="r-pequipo">—</div>
+            <div class="text-[11px] text-subtle" id="r-pequipo-sub">—</div>
+          </div>
+          <div class="card p-4">
+            <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Multiplicador</div>
+            <div class="mt-1 font-mono text-3xl font-semibold tabular" id="r-mult">—</div>
+            <div class="text-[11px] text-subtle">bonificaciones × factores</div>
+          </div>
+        </div>
+
+        <div id="r-warn" class="space-y-2"></div>
+
+        <div class="card overflow-hidden">
+          <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Desglose</div>
+          <div id="r-breakdown" class="grid grid-cols-2 gap-px bg-border sm:grid-cols-4"></div>
+          <div id="r-formula" class="border-t border-border px-4 py-3 font-mono text-[11px] leading-relaxed text-subtle"></div>
+        </div>
+
+        <div class="grid gap-5 lg:grid-cols-2">
+          <div class="card overflow-hidden">
+            <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">¿Qué mejora más esta ronda?</div>
+            <div id="r-whatif" class="space-y-2.5 p-4"></div>
+          </div>
+          <div class="card overflow-hidden">
+            <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Pruebas de vuelo <span class="font-normal text-subtle">— media de las rondas, §9.6</span></div>
+            <div id="r-table" class="divide-y divide-border text-[12px]"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== ESTÁTICAS ==================== -->
+  <section data-panel="estaticas" class="hidden space-y-5">
+    <div class="grid gap-3 sm:grid-cols-4">
+      <div class="card p-4"><div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Estáticas</div><div class="mt-1 font-mono text-2xl font-semibold tabular"><span id="s-static">—</span><span class="text-xs text-subtle"> / 250</span></div></div>
+      <div class="card p-4"><div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Vuelo</div><div class="mt-1 font-mono text-2xl font-semibold tabular"><span id="s-flight">—</span><span class="text-xs text-subtle"> / 750</span></div></div>
+      <div class="card p-4"><div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Penalizaciones</div><div class="mt-1 font-mono text-2xl font-semibold tabular text-danger" id="s-pen">—</div></div>
+      <div class="card p-4 ring-1 ring-accent/30"><div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Total</div><div class="mt-1 font-mono text-2xl font-semibold tabular"><span id="s-total">—</span><span class="text-xs text-subtle"> / 1000</span></div></div>
+    </div>
+
+    <div class="grid gap-5 lg:grid-cols-2">
+      <div class="space-y-5">
+        {XC27_STATIC.map((g) => (
+          <div class="card overflow-hidden">
+            <div class="flex items-center justify-between border-b border-border bg-surface2/50 px-4 py-2.5">
+              <span class="text-[12px] font-semibold">{g.label} <span class="font-normal text-subtle">— {g.ref}</span></span>
+              <span class="font-mono text-[11px] text-subtle"><span data-group-sum={g.id}>0</span> / {g.max}</span>
+            </div>
+            <div class="divide-y divide-border">
+              {g.items.map((it) => (
+                <div class="px-4 py-2.5">
+                  <div class="flex items-baseline justify-between gap-3">
+                    <label class="text-[12px] font-medium" for={`st-${it.id}`}>{it.label}</label>
+                    <span class="shrink-0 font-mono text-[11px]"><span data-static-val={it.id}>0</span><span class="text-subtle"> / {it.max}</span></span>
+                  </div>
+                  <input id={`st-${it.id}`} data-static={it.id} type="range" min="0" max={it.max} step={it.max <= 5 ? 0.5 : 1} class="mt-1 w-full accent-accent" />
+                  {it.hint && <p class="text-[10px] leading-relaxed text-subtle">{it.hint}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div class="space-y-5">
+        <div class="card overflow-hidden">
+          <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Penalizaciones <span class="font-normal text-subtle">— §9.7 · se restan al resultado final</span></div>
+          <div id="pen-list" class="divide-y divide-border text-[12px]"></div>
+        </div>
+
+        <div class="card overflow-hidden">
+          <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Cotas obligatorias del plano de 3 vistas <span class="font-normal text-subtle">— §6.3</span></div>
+          <ol class="grid gap-x-6 gap-y-1 p-4 text-[11px] text-muted sm:grid-cols-2">
+            {XC27_DRAWING_DIMS.map((d, i) => <li class="flex gap-2"><span class="font-mono text-subtle">{String(i + 1).padStart(2, '0')}</span>{d}</li>)}
+          </ol>
+          <div class="border-t border-border px-4 py-2.5 text-[11px] leading-relaxed text-subtle">
+            Tolerancia en la inspección: 1 % en cotas de más de 1 m y 3.5 % en las menores. Cada centímetro de más resta 4 puntos.
+            La tabla del plano debe llevar perfiles, MAC, envergadura, alargamiento, superficies, longitud, volumen de carga, OEW y MTOW.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== CONFORMIDAD ==================== -->
+  <section data-panel="conformidad" class="hidden space-y-5">
+    <div class="card p-4">
+      <div class="mb-2 flex items-center justify-between text-[12px]"><span class="font-medium">Requisitos verificados</span><span id="chk-count" class="font-mono text-subtle">—</span></div>
+      <div class="h-1.5 overflow-hidden rounded-full bg-surface2"><div id="chk-bar" class="h-full rounded-full bg-success transition-all" style="width:0%"></div></div>
+      <p class="mt-2 text-[11px] leading-relaxed text-subtle">
+        Lo que comprueba la inspección técnica del martes 6 de julio (§7.9). Sin superarla no se vuela; repetirla al día siguiente cuesta 20 puntos.
+        Antes de cada vuelo hay además inspección prevuelo con ensayo de flexión del ala, y dos minutos para corregir lo que falle.
+      </p>
+    </div>
+    <div id="chk-groups" class="grid gap-5 lg:grid-cols-2"></div>
+  </section>
+
+  <!-- ==================== PRESUPUESTO ==================== -->
+  <section data-panel="presupuesto" class="hidden space-y-5">
+    <div class="card p-4">
+      <div class="mb-2 flex items-center justify-between text-[12px]">
+        <span class="font-medium">Coste de fabricación computable</span>
+        <span class="font-mono"><span id="b-total">—</span> <span class="text-subtle">/ {L.budgetEur} €</span></span>
+      </div>
+      <div class="h-2 overflow-hidden rounded-full bg-surface2"><div id="b-bar" class="h-full rounded-full transition-all" style="width:0%"></div></div>
+      <p class="mt-2 text-[11px] leading-relaxed text-subtle">
+        §7.2 — cuentan materiales estructurales, consumibles y electrónica al precio de venta al público, incluidos moldes, plantillas y utillajes,
+        sin descuentos ni donaciones. Quedan fuera repuestos, elementos estéticos, herramientas, emisora, caja de transporte, envíos, tasas y transporte.
+        El desglose va en el Anexo I del informe técnico; omitir el análisis de costes resta 10 puntos.
+      </p>
+    </div>
+    <div class="card overflow-hidden">
+      <div class="flex items-center justify-between border-b border-border bg-surface2/50 px-4 py-2.5">
+        <span class="text-[12px] font-semibold">Partidas</span>
+        <div class="flex gap-2">
+          <button id="b-add" class="btn !py-1 text-[11px]">Añadir partida</button>
+          <button id="b-csv" class="btn !py-1 text-[11px]">Exportar CSV</button>
+          <button id="b-reset" class="btn !py-1 text-[11px]">Restaurar ejemplo</button>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[720px] text-[12px]">
+          <thead class="text-left text-[10px] uppercase tracking-wide text-subtle">
+            <tr class="border-b border-border">
+              <th class="px-4 py-2 font-semibold">Concepto</th>
+              <th class="px-2 py-2 font-semibold">Categoría</th>
+              <th class="px-2 py-2 text-right font-semibold">Uds.</th>
+              <th class="px-2 py-2 text-right font-semibold">PVP unitario (€)</th>
+              <th class="px-2 py-2 text-right font-semibold">Importe</th>
+              <th class="px-2 py-2 text-center font-semibold">Computa</th>
+              <th class="px-2 py-2"></th>
+            </tr>
+          </thead>
+          <tbody id="b-rows" class="divide-y divide-border"></tbody>
+        </table>
+      </div>
+      <div id="b-cats" class="flex flex-wrap gap-x-5 gap-y-1 border-t border-border px-4 py-3 text-[11px] text-muted"></div>
+    </div>
+  </section>
+
+  <!-- ==================== CALENDARIO ==================== -->
+  <section data-panel="calendario" class="hidden space-y-5">
+    <div class="grid gap-5 lg:grid-cols-2">
+      <div class="card overflow-hidden">
+        <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Fechas de interés <span class="font-normal text-subtle">— §5.1</span></div>
+        <div class="divide-y divide-border">
+          {XC27_DEADLINES.map((d) => (
+            <div class="flex items-center gap-3 px-4 py-2.5">
+              <div class="w-20 shrink-0 font-mono text-[11px] text-muted">{d.date.split('-').reverse().join('/')}</div>
+              <div class="min-w-0 flex-1">
+                <div class="text-[12px] font-medium">{d.label}</div>
+                {d.detail && <div class="text-[11px] leading-relaxed text-subtle">{d.detail}</div>}
+              </div>
+              <span class="badge shrink-0" data-deadline={d.date} data-kind={d.kind}>—</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div class="space-y-5">
+        <div class="card overflow-hidden">
+          <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Programa de la competición <span class="font-normal text-subtle">— §5.2</span></div>
+          <div class="divide-y divide-border text-[12px]">
+            {programme.map(([day, what]) => (
+              <div class="flex gap-3 px-4 py-2.5"><div class="w-20 shrink-0 font-mono text-[11px] text-muted">{day}</div><div class="text-muted">{what}</div></div>
+            ))}
+          </div>
+        </div>
+        <div class="card overflow-hidden">
+          <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Un día de vuelo <span class="font-normal text-subtle">— §8.1</span></div>
+          <ol class="space-y-1 p-4 text-[11px] leading-relaxed text-muted">
+            <li>1 · Llegada con el avión dentro de la caja; inspección rápida de la caja.</li>
+            <li>2 · Montaje en menos de {L.assemblyMaxMin} minutos, sólo tras la autorización.</li>
+            <li>3 · Ficha prevuelo entregada al menos 15 min antes del turno: carga, marca de despegue, piloto externo, pasar a la cola.</li>
+            <li>4 · Estación de carga cronometrada (máx. 4 min, tres personas).</li>
+            <li>5 · Ensayo estructural del ala y acople de la caja de telemetría.</li>
+            <li>6 · Vuelo: ascenso y planeo → pitstop → pilones.</li>
+            <li>7 · Desacople de la telemetría en 3 minutos.</li>
+          </ol>
+          <div class="border-t border-border px-4 py-2.5 text-[11px] leading-relaxed text-subtle">
+            Campo: {XC27_FIELD.name}, a unos 50 min de la UPV, ~{XC27_FIELD.elevationM} m de elevación, pista de {XC27_FIELD.surface}.
+            En la Categoría Académica se vuela por orden inverso a la clasificación provisional.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    import {
+      XC27_LIMITS, XC27_STATIC, XC27_PENALTIES, XC27_CHECKLIST, XC27_DEADLINES,
+      altitudeScore, glideScore, pylonScore, scoreXc27Round, roundPoints, flightPoints,
+      loadBonusBreakEvenS, daysUntil, ALT_SCORE_PEAK_M,
+      type Xc27RoundInput,
+    } from '../lib/xc27';
+    import { plot, rgb, vline } from '../lib/plot';
+
+    const $ = (id: string) => document.getElementById(id)!;
+    const num = (id: string) => parseFloat(($(id) as HTMLInputElement).value) || 0;
+    const val = (id: string) => ($(id) as HTMLInputElement | HTMLSelectElement).value;
+    const chk = (id: string) => ($(id) as HTMLInputElement).checked;
+    const setVal = (id: string, v: string | number) => { ($(id) as HTMLInputElement).value = String(v); };
+    const setChk = (id: string, v: boolean) => { ($(id) as HTMLInputElement).checked = v; };
+    const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+
+    // ---------------- estado persistente ----------------
+    interface Round { flown: boolean; pMax: number; input: Xc27RoundInput; }
+    interface BudgetLine { name: string; cat: string; qty: number; price: number; counts: boolean; }
+    interface State {
+      active: number;
+      rounds: Round[];
+      statics: Record<string, number>;
+      penalties: Record<string, number>;
+      checks: Record<string, boolean>;
+      budget: BudgetLine[];
+    }
+
+    const CATS = ['Propulsión', 'Radio', 'Estructura', 'Consumibles', 'Utillaje', 'No computa'];
+    const defaultBudget = (): BudgetLine[] => [
+      { name: 'Motor Emax GT2820/06 985KV', cat: 'Propulsión', qty: 1, price: 24.2, counts: true },
+      { name: 'ESC 60 A', cat: 'Propulsión', qty: 1, price: 32, counts: true },
+      { name: 'Batería LiPo 3S 4000 mAh', cat: 'Propulsión', qty: 1, price: 38, counts: true },
+      { name: 'Hélice plegable + cono', cat: 'Propulsión', qty: 1, price: 26, counts: true },
+      { name: 'Receptor 2.4 GHz', cat: 'Radio', qty: 1, price: 25, counts: true },
+      { name: 'Servos', cat: 'Radio', qty: 5, price: 7, counts: true },
+      { name: 'Batería auxiliar 2S 650 mAh + interruptor', cat: 'Radio', qty: 1, price: 16, counts: true },
+      { name: 'Cableado y conectores XT60', cat: 'Radio', qty: 1, price: 10, counts: true },
+      { name: 'Balsa y contrachapado', cat: 'Estructura', qty: 1, price: 45, counts: true },
+      { name: 'Tubo / pletina de carbono (larguero)', cat: 'Estructura', qty: 1, price: 32, counts: true },
+      { name: 'Fibra de vidrio + resina epoxi', cat: 'Estructura', qty: 1, price: 48, counts: true },
+      { name: 'Tren de aterrizaje y ruedas', cat: 'Estructura', qty: 1, price: 16, counts: true },
+      { name: 'Film de entelado', cat: 'Consumibles', qty: 2, price: 11, counts: true },
+      { name: 'Adhesivos, tornillería M3 e imanes', cat: 'Consumibles', qty: 1, price: 24, counts: true },
+      { name: 'Filamento para moldes y piezas 3D', cat: 'Utillaje', qty: 1, price: 24, counts: true },
+      { name: 'Repuestos (segunda ala, hélices)', cat: 'No computa', qty: 1, price: 80, counts: false },
+      { name: 'Caja de transporte', cat: 'No computa', qty: 1, price: 35, counts: false },
+    ];
+
+    const defaultInput = (): Xc27RoundInput => ({
+      alt60M: 100, glideDistM: 1200, pylonTimeS: 60, declaredKg: 2.5, carriedKg: 2.5, loadUnloadS: 50,
+      takeoff: '40', externalPilot: false, legality: 1, repairedNoSpares: false, loadBonusLost: false, payloadUnit: 'kg',
+    });
+    const defaultState = (): State => ({
+      active: 0,
+      rounds: Array.from({ length: XC27_LIMITS.rounds }, (_, i) => ({ flown: i === 0, pMax: 3, input: defaultInput() })),
+      statics: Object.fromEntries(XC27_STATIC.flatMap((g) => g.items.map((it) => [it.id, Math.round(it.max * 0.7 * 2) / 2]))),
+      penalties: {}, checks: {}, budget: defaultBudget(),
+    });
+
+    const KEY = 'xc27-hub';
+    let state: State = defaultState();
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) {
+        const saved = JSON.parse(raw) as Partial<State>;
+        const base = defaultState();
+        state = {
+          ...base, ...saved,
+          rounds: base.rounds.map((r, i) => ({ ...r, ...(saved.rounds?.[i] ?? {}), input: { ...r.input, ...(saved.rounds?.[i]?.input ?? {}) } })),
+          statics: { ...base.statics, ...(saved.statics ?? {}) },
+        };
+      }
+    } catch { /* sin almacenamiento: se trabaja en memoria */ }
+    const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* idem */ } };
+
+    // ---------------- pestañas ----------------
+    function showTab(id: string) {
+      document.querySelectorAll<HTMLElement>('[data-panel]').forEach((p) => p.classList.toggle('hidden', p.dataset.panel !== id));
+      document.querySelectorAll<HTMLElement>('.tab-btn').forEach((b) => {
+        const on = b.dataset.tab === id;
+        b.classList.toggle('border-accent', on); b.classList.toggle('text-fg', on);
+        b.classList.toggle('border-transparent', !on); b.classList.toggle('text-muted', !on);
+        b.setAttribute('aria-selected', String(on));
+      });
+      if (location.hash.slice(1) !== id) history.replaceState(null, '', '#' + id);
+      // Plotly necesita el contenedor visible para medirlo
+      if (id === 'resumen') renderCurves();
+    }
+    document.querySelectorAll<HTMLElement>('.tab-btn').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab!)));
+
+    // ---------------- puntuación ----------------
+    const roundScore = (r: Round) => {
+      const res = scoreXc27Round(r.input);
+      return { res, pts: roundPoints(res.pEquipo, r.pMax), raw: roundPoints(res.pEquipo, r.pMax, false) };
+    };
+    const flightTotal = () => flightPoints(state.rounds.filter((r) => r.flown).map((r) => roundScore(r).pts));
+    const staticTotal = () => XC27_STATIC.reduce((s, g) => s + g.items.reduce((a, it) => a + (state.statics[it.id] ?? 0), 0), 0);
+    const penaltyTotal = () => XC27_PENALTIES.reduce((s, p) => {
+      if (p.unit === 'info') return s;
+      const q = state.penalties[p.id] ?? 0;
+      return s + Math.min(p.max ?? Infinity, q * p.points);
+    }, 0);
+    const budgetTotal = () => state.budget.filter((l) => l.counts).reduce((s, l) => s + l.qty * l.price, 0);
+
+    function renderKpis() {
+      const fl = flightTotal(), st = staticTotal(), pen = penaltyTotal();
+      const total = Math.max(0, fl + st - pen);
+      $('k-total').textContent = total.toFixed(0);
+      $('k-total-sub').textContent = `${st.toFixed(0)} estáticas + ${fl.toFixed(0)} vuelo${pen > 0 ? ` − ${pen.toFixed(0)} penal.` : ''}`;
+      $('s-static').textContent = st.toFixed(1); $('s-flight').textContent = fl.toFixed(0);
+      $('s-pen').textContent = pen > 0 ? `−${pen.toFixed(0)}` : '0'; $('s-total').textContent = total.toFixed(0);
+
+      const next = XC27_DEADLINES.map((d) => ({ d, n: daysUntil(d.date) })).filter((x) => x.n >= 0)[0];
+      $('k-next').textContent = next ? `${next.n} d` : '—';
+      $('k-next-sub').textContent = next ? next.d.label : 'Competición finalizada';
+
+      const done = XC27_CHECKLIST.filter((c) => state.checks[c.id]).length;
+      $('k-check').textContent = `${done}/${XC27_CHECKLIST.length}`;
+
+      const b = budgetTotal();
+      $('k-budget').textContent = b.toFixed(0);
+      const left = XC27_LIMITS.budgetEur - b;
+      $('k-budget-sub').textContent = left >= 0 ? `quedan ${left.toFixed(0)} €` : `excede en ${(-left).toFixed(0)} €`;
+      $('k-budget-sub').className = `text-[11px] ${left >= 0 ? 'text-subtle' : 'text-danger'}`;
+    }
+
+    // ---------------- curvas de los parciales ----------------
+    function renderCurves() {
+      const r = state.rounds[state.active].input;
+      const accent = rgb('--accent'), mark = rgb('--success');
+      const line = (x: number[], y: number[]) => ({ x, y, mode: 'lines', line: { color: accent, width: 2 }, showlegend: false, hovertemplate: '%{x:.0f} → %{y:.2f}<extra></extra>' });
+      const dot = (x: number, y: number, name: string) => ({ x: [x], y: [y], mode: 'markers', name, marker: { size: 9, color: mark }, hovertemplate: `${name}: %{y:.2f}<extra></extra>` });
+
+      const a = Array.from({ length: 121 }, (_, i) => i);
+      plot('c-pas', [line(a, a.map(altitudeScore)), dot(r.alt60M, altitudeScore(r.alt60M), 'ronda activa')], {
+        xaxis: { title: 'altitud a 60 s (m)' }, yaxis: { title: 'P_AS' }, shapes: [vline(ALT_SCORE_PEAK_M, rgb('--subtle'))],
+      });
+      const d = Array.from({ length: 61 }, (_, i) => i * 50);
+      plot('c-pve', [line(d, d.map(glideScore)), dot(r.glideDistM, glideScore(r.glideDistM), 'ronda activa')], {
+        xaxis: { title: 'distancia de planeo (m)' }, yaxis: { title: 'P_VE' },
+      });
+      const t = Array.from({ length: 71 }, (_, i) => 30 + i);
+      plot('c-ppi', [line(t, t.map(pylonScore)), ...(r.pylonTimeS > 0 ? [dot(r.pylonTimeS, pylonScore(r.pylonTimeS), 'ronda activa')] : [])], {
+        xaxis: { title: 'tiempo de pilones (s)' }, yaxis: { title: 'P_PI' },
+      });
+    }
+
+    // ---------------- calculadora ----------------
+    function loadRound() {
+      const r = state.rounds[state.active], i = r.input;
+      setVal('r-alt', i.alt60M); setVal('r-glide', i.glideDistM); setVal('r-pylon', i.pylonTimeS);
+      setVal('r-declared', i.declaredKg); setVal('r-carried', i.carriedKg); setVal('r-tcd', i.loadUnloadS);
+      setVal('r-unit', i.payloadUnit); setVal('r-takeoff', i.takeoff); setVal('r-legal', i.legality);
+      setVal('r-pmax', r.pMax);
+      setChk('r-loadlost', i.loadBonusLost); setChk('r-extpilot', i.externalPilot); setChk('r-spares', i.repairedNoSpares);
+      setChk('r-flown', r.flown);
+      $('round-tabs').innerHTML = state.rounds.map((_, k) =>
+        `<button data-round="${k}" class="btn !px-3 !py-1.5 text-[12px] ${k === state.active ? 'btn-primary' : ''}">R${k + 1}</button>`).join('');
+      $('round-tabs').querySelectorAll<HTMLElement>('[data-round]').forEach((b) =>
+        b.addEventListener('click', () => { state.active = parseInt(b.dataset.round!, 10); save(); loadRound(); renderRound(); }));
+    }
+
+    function readRound() {
+      const r = state.rounds[state.active];
+      r.flown = chk('r-flown');
+      r.pMax = Math.max(0.01, num('r-pmax'));
+      r.input = {
+        alt60M: Math.max(0, num('r-alt')), glideDistM: Math.max(0, num('r-glide')), pylonTimeS: Math.max(0, num('r-pylon')),
+        declaredKg: Math.max(0, num('r-declared')), carriedKg: Math.max(0, num('r-carried')), loadUnloadS: Math.max(0, num('r-tcd')),
+        takeoff: val('r-takeoff') as Xc27RoundInput['takeoff'], externalPilot: chk('r-extpilot'),
+        legality: parseFloat(val('r-legal')) as Xc27RoundInput['legality'],
+        repairedNoSpares: chk('r-spares'), loadBonusLost: chk('r-loadlost'),
+        payloadUnit: val('r-unit') as Xc27RoundInput['payloadUnit'],
+      };
+    }
+
+    const cell = (k: string, v: string, sub: string, tone = '') =>
+      `<div class="bg-surface p-3"><div class="text-[10px] uppercase tracking-wide text-subtle">${k}</div>
+        <div class="mt-0.5 font-mono text-[15px] font-medium tabular ${tone}">${v}</div><div class="text-[10px] text-subtle">${sub}</div></div>`;
+    const warn = (kind: 'warning' | 'danger', html: string) =>
+      `<div class="card ${kind === 'danger' ? 'border-danger/40 bg-danger/5 text-danger' : 'border-warning/40 bg-warning/5 text-warning'} p-3 text-[12px] leading-relaxed">${html}</div>`;
+
+    function renderRound() {
+      const r = state.rounds[state.active], i = r.input;
+      const { res, pts, raw } = roundScore(r);
+      $('r-points').textContent = pts.toFixed(0);
+      $('r-points-sub').textContent = raw > 750.5 ? 'de 750 · bate la marca de referencia' : `de 750 · ${((100 * res.pEquipo) / r.pMax).toFixed(0)} % de la mejor marca`;
+      $('r-pequipo').textContent = res.pEquipo.toFixed(2);
+      const share = res.efficient + res.pPI > 0 ? (100 * res.efficient) / (res.efficient + res.pPI) : 0;
+      $('r-pequipo-sub').textContent = `${share.toFixed(0)} % carga·ascenso·planeo · ${(100 - share).toFixed(0)} % pilones`;
+      $('r-mult').textContent = '×' + res.multiplier.toFixed(3);
+
+      const tone = (v: number) => (v > 1 ? 'text-success' : v < 1 ? 'text-danger' : '');
+      $('r-breakdown').innerHTML =
+        cell('P_AS', res.pAS.toFixed(1), `${i.alt60M.toFixed(0)} m a los 60 s`) +
+        cell('P_CA', res.pCA.toFixed(4), `${i.declaredKg.toFixed(2)} kg declarados`) +
+        cell('P_VE', res.pVE.toFixed(3), `${i.glideDistM.toFixed(0)} m de planeo`) +
+        cell('P_PI', res.pPI.toFixed(3), i.pylonTimeS > 0 ? `${i.pylonTimeS.toFixed(1)} s` : 'sin pilones') +
+        cell('B_predicción', '×' + res.bPrediccion, i.declaredKg > 0 ? `${((100 * i.carriedKg) / i.declaredKg).toFixed(0)} % de lo declarado` : 'sin carga', tone(res.bPrediccion)) +
+        cell('B_despegue', '×' + res.bDespegue, i.takeoff === 'foul' ? 'fuera de pista' : `${i.takeoff} m`, tone(res.bDespegue)) +
+        cell('B_carga', '×' + res.bCarga.toFixed(3), `T_CD ${i.loadUnloadS.toFixed(0)} s`, tone(res.bCarga)) +
+        cell('S · L', '×' + (res.sPiloto * res.sRepuestos * res.lVuelo).toFixed(3), 'piloto · repuestos · validez', tone(res.sPiloto * res.sRepuestos * res.lVuelo));
+      $('r-formula').innerHTML =
+        `(${res.pAS.toFixed(1)} · ${res.pCA.toFixed(4)} · ${res.pVE.toFixed(3)} + ${res.pPI.toFixed(3)}) × ${res.multiplier.toFixed(3)}
+         = <span class="text-fg">${res.pEquipo.toFixed(3)}</span> &nbsp;→&nbsp; 750 · ${res.pEquipo.toFixed(3)} / ${r.pMax} = <span class="text-fg">${raw.toFixed(0)} pts</span>`;
+
+      const w: string[] = [];
+      if (i.alt60M > XC27_LIMITS.altMaxM) w.push(warn('danger', `Altitud por encima de ${XC27_LIMITS.altMaxM} m: si se supera el límite deliberadamente el vuelo no se contabiliza. P_AS = 0.`));
+      if (i.declaredKg > 0 && i.carriedKg > i.declaredKg * 1.001) w.push(warn('warning', 'Llevas más carga de la declarada: P_CA usa la declarada, así que el exceso sólo resta ascenso y despegue.'));
+      if (i.declaredKg > 0 && i.carriedKg < 0.9 * i.declaredKg) w.push(warn('warning', `La carga transportada es el ${((100 * i.carriedKg) / i.declaredKg).toFixed(0)} % de la declarada: B_predicción baja a ×${res.bPrediccion}. Con el 90 % ya se cobra el 100 %.`));
+      if (i.carriedKg > 0 && i.carriedKg * 1000 < XC27_LIMITS.minPayloadG) w.push(warn('warning', `El avión debe poder albergar al menos ${XC27_LIMITS.minPayloadG} g de carga (§7.8), aunque se permite volar sin ella.`));
+      if (i.loadUnloadS > 35 && res.bCarga < 1) w.push(warn('warning', `Con ${i.carriedKg} kg, B_carga baja de 1 a partir de ${loadBonusBreakEvenS(i.carriedKg).toFixed(0)} s de carga + descarga: aquí penaliza.`));
+      if (i.loadUnloadS > XC27_LIMITS.loadMaxS + XC27_LIMITS.pitstopMaxS) w.push(warn('danger', 'T_CD supera los 4 min de carga más los 120 s de pitstop que permite el reglamento.'));
+      if (i.pylonTimeS === 0) w.push(warn('warning', 'Sin tiempo de pilones: se conservan los puntos del primer vuelo, pero P_PI = 0.'));
+      $('r-warn').innerHTML = w.join('');
+
+      // qué mejora más
+      const tries: [string, Partial<Xc27RoundInput>][] = [
+        ['+10 m de altitud a 60 s', { alt60M: Math.min(120, i.alt60M + 10) }],
+        ['+100 m de planeo', { glideDistM: i.glideDistM + 100 }],
+        ['−5 s en pilones', { pylonTimeS: i.pylonTimeS > 5 ? i.pylonTimeS - 5 : i.pylonTimeS }],
+        ['+250 g declarados y transportados', { declaredKg: i.declaredKg + 0.25, carriedKg: i.carriedKg + 0.25 }],
+        ['−10 s de carga + descarga', { loadUnloadS: Math.max(0, i.loadUnloadS - 10) }],
+        ['Despegar en la marca anterior', { takeoff: i.takeoff === '60' ? '40' : i.takeoff === '40' ? '20' : i.takeoff }],
+      ];
+      const deltas = tries.map(([label, ch]) => ({
+        label, d: roundPoints(scoreXc27Round({ ...i, ...ch }).pEquipo, r.pMax, false) - raw,
+      })).sort((a, b) => b.d - a.d);
+      const max = Math.max(...deltas.map((x) => Math.abs(x.d)), 0.001);
+      $('r-whatif').innerHTML = deltas.map((x) => `<div class="flex items-center gap-3">
+        <div class="w-52 shrink-0 truncate text-[12px]">${x.label}</div>
+        <div class="h-2 flex-1 overflow-hidden rounded-full bg-surface2"><div class="h-full rounded-full ${x.d >= 0 ? 'bg-success' : 'bg-danger'}" style="width:${(Math.abs(x.d) / max) * 100}%"></div></div>
+        <div class="w-14 shrink-0 text-right font-mono text-[12px] tabular ${x.d >= 0 ? 'text-success' : 'text-danger'}">${x.d >= 0 ? '+' : ''}${x.d.toFixed(1)}</div>
+      </div>`).join('');
+
+      $('r-table').innerHTML = state.rounds.map((rr, k) => {
+        const s = roundScore(rr);
+        return `<div class="flex items-center gap-3 px-4 py-2 ${rr.flown ? '' : 'opacity-50'}">
+          <div class="w-8 shrink-0 font-mono text-subtle">R${k + 1}</div>
+          <div class="min-w-0 flex-1 truncate font-mono text-[11px] text-muted">${rr.input.alt60M.toFixed(0)} m · ${rr.input.glideDistM.toFixed(0)} m · ${rr.input.pylonTimeS.toFixed(0)} s · ${rr.input.carriedKg} kg</div>
+          <div class="shrink-0 font-mono text-[11px] text-subtle">P ${s.res.pEquipo.toFixed(2)}</div>
+          <div class="w-14 shrink-0 text-right font-mono tabular">${rr.flown ? s.pts.toFixed(0) : '—'}</div>
+        </div>`;
+      }).join('') + `<div class="flex items-center justify-between px-4 py-2.5 font-medium"><span>Media sobre ${XC27_LIMITS.rounds} rondas</span><span class="font-mono tabular">${flightTotal().toFixed(0)} / 750</span></div>
+        <div class="px-4 pb-3 text-[11px] leading-relaxed text-subtle">La media se hace sobre todas las rondas de la competición: una ronda sin volar o nula cuenta como 0.</div>`;
+
+      renderKpis();
+    }
+
+    ['r-alt', 'r-glide', 'r-pylon', 'r-declared', 'r-carried', 'r-tcd', 'r-unit', 'r-takeoff', 'r-legal', 'r-pmax',
+      'r-loadlost', 'r-extpilot', 'r-spares', 'r-flown'].forEach((id) => {
+      $(id).addEventListener('input', () => { readRound(); save(); renderRound(); });
+    });
+    $('btn-copy-round').addEventListener('click', () => {
+      const src = state.rounds[state.active];
+      state.rounds = state.rounds.map(() => ({ flown: true, pMax: src.pMax, input: { ...src.input } }));
+      save(); loadRound(); renderRound();
+    });
+    $('btn-from-study').addEventListener('click', () => {
+      try {
+        const raw = localStorage.getItem('xc27-round-from-study');
+        if (!raw) { $('r-warn').innerHTML = warn('warning', 'Todavía no hay una ronda simulada: abre «Estudiar el avión» y vuelve.'); return; }
+        const s = JSON.parse(raw) as { input: Xc27RoundInput; pMax: number };
+        state.rounds[state.active] = { flown: true, pMax: s.pMax, input: { ...defaultInput(), ...s.input } };
+        save(); loadRound(); renderRound();
+      } catch { /* dato corrupto: se ignora */ }
+    });
+
+    // ---------------- estáticas ----------------
+    function renderStatics() {
+      for (const g of XC27_STATIC) {
+        let sum = 0;
+        for (const it of g.items) {
+          const v = state.statics[it.id] ?? 0;
+          sum += v;
+          const inp = document.querySelector<HTMLInputElement>(`[data-static="${it.id}"]`);
+          if (inp && parseFloat(inp.value) !== v) inp.value = String(v);
+          const out = document.querySelector(`[data-static-val="${it.id}"]`);
+          if (out) out.textContent = String(v);
+        }
+        const gs = document.querySelector(`[data-group-sum="${g.id}"]`);
+        if (gs) gs.textContent = sum.toFixed(sum % 1 ? 1 : 0);
+      }
+      renderKpis();
+    }
+    document.querySelectorAll<HTMLInputElement>('[data-static]').forEach((el) => el.addEventListener('input', () => {
+      state.statics[el.dataset.static!] = parseFloat(el.value) || 0; save(); renderStatics();
+    }));
+
+    const UNIT: Record<string, string> = { 'por-dia': 'días', 'por-cm': 'cm', 'por-unidad': 'veces', fijo: '' };
+    function renderPenalties() {
+      $('pen-list').innerHTML = XC27_PENALTIES.map((p) => {
+        const q = state.penalties[p.id] ?? 0;
+        const control = p.unit === 'info'
+          ? '<span class="text-[11px] text-subtle">según el caso</span>'
+          : p.unit === 'fijo'
+            ? `<input type="checkbox" class="accent-accent" data-pen="${p.id}" ${q > 0 ? 'checked' : ''} />`
+            : `<input type="number" min="0" step="1" value="${q}" data-pen="${p.id}" class="field !w-16 !px-2 !py-1 text-right text-[12px]" /><span class="w-9 text-[10px] text-subtle">${UNIT[p.unit]}</span>`;
+        const pts = p.unit === 'info' ? (p.effect ?? '') : `−${p.points}${p.unit !== 'fijo' ? '/' + UNIT[p.unit].replace(/s$/, '') : ''}${p.max ? ` (máx ${p.max})` : ''}`;
+        return `<div class="flex items-center gap-3 px-4 py-2">
+          <div class="min-w-0 flex-1"><div>${esc(p.label)}</div>${p.effect && p.unit !== 'info' ? `<div class="text-[10px] text-subtle">${esc(p.effect)}</div>` : ''}</div>
+          <div class="shrink-0 font-mono text-[11px] text-danger">${esc(pts)}</div>
+          <div class="flex w-28 shrink-0 items-center justify-end gap-1.5">${control}</div>
+        </div>`;
+      }).join('');
+      $('pen-list').querySelectorAll<HTMLInputElement>('[data-pen]').forEach((el) => el.addEventListener('input', () => {
+        state.penalties[el.dataset.pen!] = el.type === 'checkbox' ? (el.checked ? 1 : 0) : Math.max(0, parseFloat(el.value) || 0);
+        save(); renderKpis();
+      }));
+    }
+
+    // ---------------- conformidad ----------------
+    function renderChecks() {
+      const groups = [...new Set(XC27_CHECKLIST.map((c) => c.group))];
+      $('chk-groups').innerHTML = groups.map((g) => {
+        const items = XC27_CHECKLIST.filter((c) => c.group === g);
+        const done = items.filter((c) => state.checks[c.id]).length;
+        return `<div class="card overflow-hidden">
+          <div class="flex items-center justify-between border-b border-border bg-surface2/50 px-4 py-2.5">
+            <span class="text-[12px] font-semibold">${g}</span><span class="font-mono text-[11px] ${done === items.length ? 'text-success' : 'text-subtle'}">${done}/${items.length}</span>
+          </div>
+          <div class="divide-y divide-border">${items.map((c) => `
+            <label class="flex cursor-pointer gap-3 px-4 py-2.5 transition hover:bg-surface2">
+              <input type="checkbox" class="mt-0.5 accent-accent" data-check="${c.id}" ${state.checks[c.id] ? 'checked' : ''} />
+              <span class="min-w-0 flex-1"><span class="block text-[12px] font-medium">${esc(c.label)}</span>
+                <span class="block text-[11px] leading-relaxed text-subtle">${esc(c.detail)}</span></span>
+              <span class="shrink-0 font-mono text-[10px] text-subtle">${c.ref}</span>
+            </label>`).join('')}</div>
+        </div>`;
+      }).join('');
+      $('chk-groups').querySelectorAll<HTMLInputElement>('[data-check]').forEach((el) => el.addEventListener('change', () => {
+        state.checks[el.dataset.check!] = el.checked; save(); renderChecks();
+      }));
+      const done = XC27_CHECKLIST.filter((c) => state.checks[c.id]).length;
+      $('chk-count').textContent = `${done} de ${XC27_CHECKLIST.length}`;
+      ($('chk-bar') as HTMLElement).style.width = `${(100 * done) / XC27_CHECKLIST.length}%`;
+      renderKpis();
+    }
+
+    // ---------------- presupuesto ----------------
+    function renderBudgetTotals() {
+      const total = budgetTotal(), lim = XC27_LIMITS.budgetEur;
+      $('b-total').textContent = total.toFixed(2) + ' €';
+      const bar = $('b-bar') as HTMLElement;
+      bar.style.width = `${Math.min(100, (100 * total) / lim)}%`;
+      bar.className = `h-full rounded-full transition-all ${total > lim ? 'bg-danger' : total > 0.9 * lim ? 'bg-warning' : 'bg-success'}`;
+      $('b-cats').innerHTML = CATS.map((c) => {
+        const s = state.budget.filter((l) => l.cat === c).reduce((a, l) => a + l.qty * l.price, 0);
+        return s > 0 ? `<span>${c} <span class="font-mono text-subtle">${s.toFixed(0)} €</span></span>` : '';
+      }).join('') + `<span class="ml-auto font-mono">${total <= lim ? `margen ${(lim - total).toFixed(2)} €` : `<span class="text-danger">excede ${(total - lim).toFixed(2)} €</span>`}</span>`;
+      state.budget.forEach((l, i) => { const c = document.querySelector(`[data-b-amount="${i}"]`); if (c) c.textContent = (l.qty * l.price).toFixed(2); });
+      renderKpis();
+    }
+    function renderBudget() {
+      $('b-rows').innerHTML = state.budget.map((l, i) => `<tr class="${l.counts ? '' : 'opacity-60'}">
+        <td class="px-4 py-1.5"><input data-b="${i}" data-f="name" value="${esc(l.name)}" class="field !py-1 text-[12px]" /></td>
+        <td class="px-2 py-1.5"><select data-b="${i}" data-f="cat" class="field !w-32 !py-1 text-[12px]">${CATS.map((c) => `<option ${c === l.cat ? 'selected' : ''}>${c}</option>`).join('')}</select></td>
+        <td class="px-2 py-1.5"><input data-b="${i}" data-f="qty" type="number" min="0" step="1" value="${l.qty}" class="field !w-16 !py-1 text-right text-[12px]" /></td>
+        <td class="px-2 py-1.5"><input data-b="${i}" data-f="price" type="number" min="0" step="0.5" value="${l.price}" class="field !w-24 !py-1 text-right text-[12px]" /></td>
+        <td class="px-2 py-1.5 text-right font-mono tabular" data-b-amount="${i}">${(l.qty * l.price).toFixed(2)}</td>
+        <td class="px-2 py-1.5 text-center"><input data-b="${i}" data-f="counts" type="checkbox" class="accent-accent" ${l.counts ? 'checked' : ''} /></td>
+        <td class="px-2 py-1.5 text-right"><button data-b-del="${i}" class="text-subtle transition hover:text-danger" aria-label="Eliminar partida">✕</button></td>
+      </tr>`).join('');
+      $('b-rows').querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-b]').forEach((el) => el.addEventListener('input', () => {
+        const l = state.budget[parseInt(el.dataset.b!, 10)], f = el.dataset.f!;
+        if (f === 'name') l.name = el.value;
+        else if (f === 'cat') { l.cat = el.value; if (l.cat === 'No computa') l.counts = false; }
+        else if (f === 'qty') l.qty = Math.max(0, parseFloat(el.value) || 0);
+        else if (f === 'price') l.price = Math.max(0, parseFloat(el.value) || 0);
+        else if (f === 'counts') l.counts = (el as HTMLInputElement).checked;
+        save();
+        // cambiar categoría o «computa» altera el aspecto de la fila
+        if (f === 'cat' || f === 'counts') renderBudget(); else renderBudgetTotals();
+      }));
+      $('b-rows').querySelectorAll<HTMLElement>('[data-b-del]').forEach((el) => el.addEventListener('click', () => {
+        state.budget.splice(parseInt(el.dataset.bDel!, 10), 1); save(); renderBudget();
+      }));
+      renderBudgetTotals();
+    }
+    $('b-add').addEventListener('click', () => { state.budget.push({ name: 'Nueva partida', cat: 'Estructura', qty: 1, price: 0, counts: true }); save(); renderBudget(); });
+    $('b-reset').addEventListener('click', () => { state.budget = defaultBudget(); save(); renderBudget(); });
+    $('b-csv').addEventListener('click', () => {
+      const csv = 'concepto,categoria,unidades,pvp_unitario_eur,importe_eur,computa\n' + state.budget.map((l) =>
+        [`"${l.name.replace(/"/g, '""')}"`, l.cat, l.qty, l.price.toFixed(2), (l.qty * l.price).toFixed(2), l.counts ? 'si' : 'no'].join(',')).join('\n')
+        + `\n"TOTAL COMPUTABLE",,,,${budgetTotal().toFixed(2)},\n`;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+      a.download = 'xc27-presupuesto.csv'; a.click(); URL.revokeObjectURL(a.href);
+    });
+
+    // ---------------- calendario ----------------
+    document.querySelectorAll<HTMLElement>('[data-deadline]').forEach((el) => {
+      const n = daysUntil(el.dataset.deadline!);
+      el.textContent = n < 0 ? 'pasado' : n === 0 ? 'hoy' : `${n} días`;
+      if (n >= 0 && n <= 30 && el.dataset.kind !== 'evento') el.classList.add('!border-warning/40', '!text-warning');
+      if (n < 0) el.classList.add('opacity-60');
+    });
+
+    // ---------------- arranque ----------------
+    loadRound(); renderRound(); renderStatics(); renderPenalties(); renderChecks(); renderBudget();
+    const initial = location.hash.slice(1);
+    showTab(document.querySelector(`[data-panel="${initial}"]`) ? initial : 'resumen');
+    window.addEventListener('themechange', renderCurves);
+  </script>
+</AppShell>

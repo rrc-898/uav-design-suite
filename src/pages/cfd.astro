@@ -1,0 +1,294 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+---
+<AppShell title="CFD Studio" subtitle="Aerodinámica · Lifting-Line + drag buildup · lazo con propulsión">
+  <script is:inline src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight">CFD Studio</h1>
+      <p class="text-[13px] text-muted">Línea sustentadora de Prandtl + drag buildup. Importa la ecuación de propulsión para hallar la velocidad de equilibrio.</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <input id="imp-file" type="file" accept="application/json,.json" class="hidden" />
+      <button id="btn-import" class="btn btn-primary">Importar ecuación de propulsión</button>
+      <button id="btn-csv" class="btn">Exportar polar (CSV)</button>
+    </div>
+  </div>
+
+  <div class="grid gap-5 xl:grid-cols-[340px_1fr]">
+    <!-- ============ INPUTS ============ -->
+    <aside class="space-y-4 xl:sticky xl:top-20 xl:self-start xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto xl:pr-1">
+      <div class="card p-4">
+        <div class="mb-3 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Geometría del ala</div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div><label class="field-label">Envergadura b (m)</label><input id="w-span" type="number" step="0.05" value="1.6" class="field" /></div>
+          <div><label class="field-label">Cuerda raíz (m)</label><input id="w-croot" type="number" step="0.01" value="0.26" class="field" /></div>
+          <div><label class="field-label">Taper λ</label><input id="w-taper" type="number" step="0.05" value="0.6" class="field" /></div>
+          <div><label class="field-label">Flecha ¼c (°)</label><input id="w-sweep" type="number" step="1" value="0" class="field" /></div>
+          <div class="col-span-2"><label class="field-label">Torsión / washout punta (°)</label><input id="w-washout" type="number" step="0.5" value="-2" class="field" /></div>
+        </div>
+        <div id="planform" class="mt-3 rounded-lg border border-border bg-surface2 p-2"></div>
+      </div>
+
+      <div class="card p-4">
+        <div class="mb-3 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Perfil (sección 2D)</div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div><label class="field-label">a₀ (1/°)</label><input id="a-a0" type="number" step="0.001" value="0.105" class="field" /></div>
+          <div><label class="field-label">α₀ (°)</label><input id="a-al0" type="number" step="0.5" value="-2" class="field" /></div>
+          <div><label class="field-label">Espesor t/c</label><input id="a-tc" type="number" step="0.01" value="0.12" class="field" /></div>
+          <div><label class="field-label">Cl máx</label><input id="a-clmax" type="number" step="0.05" value="1.30" class="field" /></div>
+        </div>
+      </div>
+
+      <div class="card p-4">
+        <div class="mb-3 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Avión y entorno</div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div><label class="field-label">Masa (g)</label><input id="ac-mass" type="number" step="10" value="1800" class="field" /></div>
+          <div><label class="field-label">Altitud (m)</label><input id="ac-alt" type="number" step="50" value="0" class="field" /></div>
+          <div><label class="field-label">Fuselaje L (m)</label><input id="f-len" type="number" step="0.05" value="0.85" class="field" /></div>
+          <div><label class="field-label">Fuselaje Ø (m)</label><input id="f-dia" type="number" step="0.01" value="0.10" class="field" /></div>
+        </div>
+      </div>
+
+      <div class="card p-4">
+        <div class="mb-2 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Propulsión</div>
+        <div id="imp-info" class="rounded-lg border border-border bg-surface2 p-2.5 text-[11px] text-muted">Usando modelo demo (GT2826·10×5·4S). Importa un JSON del Propulsion Designer para tu tren real.</div>
+      </div>
+    </aside>
+
+    <!-- ============ RESULTS ============ -->
+    <section class="space-y-5">
+      <!-- KPI cards -->
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="card p-4">
+          <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Geometría</div>
+          <div class="mt-1 font-mono text-2xl font-semibold tabular" id="k-ar">—</div>
+          <div class="text-[11px] text-subtle">AR · S=<span id="k-s">—</span> m² · MAC=<span id="k-mac">—</span> m</div>
+        </div>
+        <div class="card p-4">
+          <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Aerodinámica</div>
+          <div class="mt-1 font-mono text-2xl font-semibold tabular" id="k-ld">—</div>
+          <div class="text-[11px] text-subtle">(L/D)máx · e=<span id="k-e">—</span> · CD₀=<span id="k-cd0">—</span></div>
+        </div>
+        <div class="card p-4 ring-1 ring-accent/30">
+          <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Velocidad de equilibrio</div>
+          <div class="mt-1 font-mono text-2xl font-semibold tabular" id="k-vmax">—</div>
+          <div class="text-[11px] text-subtle">m/s donde T=D (crucero máx)</div>
+        </div>
+        <div class="card p-4">
+          <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Prestaciones</div>
+          <div class="mt-1 font-mono text-2xl font-semibold tabular" id="k-vstall">—</div>
+          <div class="text-[11px] text-subtle">m/s stall · ROC<span id="k-roc">—</span> · CLα <span id="k-cla">—</span></div>
+        </div>
+      </div>
+
+      <div id="warn" class="space-y-2"></div>
+
+      <!-- Charts -->
+      <div class="grid gap-3 lg:grid-cols-2">
+        <div class="card p-3"><div class="mb-1 px-1 text-[12px] font-semibold">Empuje requerido vs disponible <span class="text-subtle font-normal">(lazo de propulsión)</span></div><div id="c-thrust" class="h-72"></div></div>
+        <div class="card p-3"><div class="mb-1 px-1 text-[12px] font-semibold">Polar de resistencia (CD vs CL) y L/D</div><div id="c-polar" class="h-72"></div></div>
+        <div class="card p-3"><div class="mb-1 px-1 text-[12px] font-semibold">Potencia requerida vs disponible</div><div id="c-power" class="h-72"></div></div>
+        <div class="card p-3"><div class="mb-1 px-1 text-[12px] font-semibold">Distribución de sustentación (semienvergadura)</div><div id="c-span" class="h-72"></div></div>
+        <div class="card p-3 lg:col-span-2"><div class="mb-1 px-1 text-[12px] font-semibold">CL y L/D vs ángulo de ataque</div><div id="c-cla" class="h-72"></div></div>
+      </div>
+
+      <p class="text-[11px] leading-relaxed text-subtle">
+        Motor aerodinámico: línea sustentadora de Prandtl (solución de Glauert por serie de Fourier) para CL, resistencia
+        inducida y eficiencia de envergadura; drag parásito por suma de componentes (Cf·FF·Swet, Raymer/McCormick). Polar
+        CD = CD₀ + CL²/(π·AR·e). El lazo de propulsión cruza T<sub>req</sub>(V)=½ρV²S·CD con T<sub>disp</sub>(V) importado del
+        Propulsion Designer. Régimen estacionario, incompresible, bajo Re — válido para UAVs. Para flecha alta o colas usar VLM (v2).
+      </p>
+    </section>
+  </div>
+
+  <script>
+    import {
+      solveLLT, liftCurve, dragPolar, performance, parasiteDrag,
+      wingArea, aspectRatio, mac, thrustAvailable, DEMO_THRUST,
+      type Wing, type Fuselage, type ThrustModel,
+    } from '../lib/aero';
+
+    const $ = (id: string) => document.getElementById(id)!;
+    const num = (id: string) => parseFloat(($(id) as HTMLInputElement).value) || 0;
+
+    let thrust: ThrustModel = { ...DEMO_THRUST };
+    let thrustLabel = 'demo';
+
+    function airDensity(alt: number) { return 1.225 * Math.pow(1 - 2.25577e-5 * alt, 4.2559); }
+
+    function readWing(): Wing {
+      return {
+        span: num('w-span'), rootChord: num('w-croot'), taper: num('w-taper'),
+        sweepDeg: num('w-sweep'), washoutDeg: num('w-washout'),
+        a0PerDeg: num('a-a0') || 0.105, alpha0Deg: num('a-al0'),
+        tc: num('a-tc') || 0.12, clMax: num('a-clmax') || 1.3, cdMin: 0.012,
+      };
+    }
+    const readFuse = (): Fuselage => ({ length: num('f-len'), diameter: num('f-dia') });
+
+    // ---- Plotly theme ----
+    const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+    const rgb = (v: string) => `rgb(${css(v)})`;
+    function L(extra: any = {}) {
+      const grid = `rgba(${css('--border')}, 0.6)`;
+      return {
+        paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+        font: { family: 'JetBrains Mono, monospace', size: 10, color: rgb('--muted') },
+        margin: { l: 50, r: 50, t: 8, b: 36 },
+        showlegend: true, legend: { orientation: 'h', y: 1.18, x: 0, font: { size: 9 } },
+        xaxis: { gridcolor: grid, zeroline: false, linecolor: grid, ...(extra.xaxis || {}) },
+        yaxis: { gridcolor: grid, zeroline: false, linecolor: grid, ...(extra.yaxis || {}) },
+        ...(extra.yaxis2 ? { yaxis2: extra.yaxis2 } : {}),
+        ...(extra.shapes ? { shapes: extra.shapes } : {}),
+      };
+    }
+    const CFG = { displayModeBar: true, responsive: true, displaylogo: false,
+      modeBarButtonsToRemove: ['lasso2d', 'select2d', 'autoScale2d'] } as any;
+
+    let lastPolar: any = null;
+
+    function drawPlanform(w: Wing) {
+      const s = w.span / 2, cr = w.rootChord, ct = cr * w.taper;
+      const tanS = Math.tan(w.sweepDeg * Math.PI / 180);
+      // x = chordwise (down), y = spanwise. LE offset by sweep.
+      const W = 320, H = 150, pad = 12;
+      const maxX = cr + s * Math.abs(tanS) + 0.001;
+      const sx = (W - 2 * pad) / (2 * s);
+      const sy = (H - 2 * pad) / maxX;
+      const sc = Math.min(sx, sy);
+      const cx = W / 2;
+      const X = (y: number) => cx + y * sc;
+      const Yt = (yle: number) => pad + yle * sc;
+      // right half points: root LE(0,0) root TE(0,cr); tip LE(s, s*tanS) tip TE(s, s*tanS+ct)
+      const pts = [
+        [X(0), Yt(0)], [X(s), Yt(s * tanS)], [X(s), Yt(s * tanS + ct)], [X(0), Yt(cr)],
+        [X(-s), Yt(s * tanS + ct)], [X(-s), Yt(s * tanS)],
+      ];
+      const poly = pts.map((p) => p.join(',')).join(' ');
+      $('planform').innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="w-full"><polygon points="${poly}" fill="rgb(${css('--accent')} / 0.18)" stroke="rgb(${css('--accent')})" stroke-width="1.5"/>` +
+        `<line x1="${cx}" y1="2" x2="${cx}" y2="${H - 2}" stroke="rgb(${css('--border')})" stroke-dasharray="3 3"/></svg>`;
+    }
+
+    function compute() {
+      const w = readWing();
+      const fuse = readFuse();
+      const rho = airDensity(num('ac-alt'));
+      const massKg = num('ac-mass') / 1000;
+      const clMaxWing = w.clMax * 0.9;
+
+      drawPlanform(w);
+
+      const S = wingArea(w), AR = aspectRatio(w), MAC = mac(w);
+      const lc = liftCurve(w);
+      const polar = dragPolar(w, fuse, Math.max(8, thrust.vMax * 0.6), rho);
+      const perf = performance(w, fuse, massKg, thrust, rho, clMaxWing);
+
+      // KPIs
+      $('k-ar').textContent = AR.toFixed(2);
+      $('k-s').textContent = S.toFixed(3);
+      $('k-mac').textContent = MAC.toFixed(3);
+      $('k-ld').textContent = perf.ldMax.toFixed(1);
+      $('k-e').textContent = polar.e.toFixed(3);
+      $('k-cd0').textContent = polar.CD0.toFixed(4);
+      $('k-vmax').textContent = perf.vMax ? perf.vMax.toFixed(1) : '—';
+      $('k-vstall').textContent = perf.vStall.toFixed(1);
+      $('k-roc').textContent = ' ' + perf.rocMax.toFixed(1) + ' m/s';
+      $('k-cla').textContent = lc.CLalphaPerRad.toFixed(2) + '/rad';
+
+      // warnings
+      const wlist: string[] = [];
+      if (!perf.vMax) wlist.push('<b>Sin equilibrio:</b> el empuje disponible no supera la resistencia en ningún punto. Reduce peso/CD₀ o sube empuje.');
+      if (perf.vMax && perf.cruiseV && perf.cruiseV < perf.vStall * 1.2) wlist.push('<b>Margen de stall bajo:</b> la velocidad de equilibrio está muy cerca del stall.');
+      if (AR < 4) wlist.push('<b>AR bajo:</b> mucha resistencia inducida; considera más envergadura.');
+      renderWarn(wlist);
+
+      // chart: thrust required vs available
+      const V = perf.curve.map((p) => p.V);
+      const A = rgb('--accent'), C = rgb('--cyan'), G = rgb('--success'), D = rgb('--danger'), Wc = rgb('--warning');
+      const shapes = perf.vMax ? [{ type: 'line', x0: perf.vMax, x1: perf.vMax, y0: 0, y1: 1, yref: 'paper', line: { color: G, width: 1.2, dash: 'dot' } }] : [];
+      Plotly.react('c-thrust', [
+        { x: V, y: perf.curve.map((p) => p.thrustReq), name: 'T requerido (N)', line: { color: A, width: 2.4 } },
+        { x: V, y: perf.curve.map((p) => p.thrustAvail), name: `T disponible (${thrustLabel})`, line: { color: G, width: 2.4 } },
+      ], L({ xaxis: { title: 'V (m/s)' }, yaxis: { title: 'N' }, shapes }), CFG);
+
+      // chart: polar + L/D
+      Plotly.react('c-polar', [
+        { x: polar.points.map((p) => p.CD), y: polar.points.map((p) => p.CL), name: 'CL vs CD', line: { color: A, width: 2.4 }, hovertemplate: 'CD %{x:.4f}<br>CL %{y:.2f}<extra></extra>' },
+        { x: polar.points.map((p) => p.CD), y: polar.points.map((p) => p.LD), name: 'L/D', line: { color: C, width: 1.8, dash: 'dot' }, yaxis: 'y2', hoverinfo: 'skip' },
+      ], L({ xaxis: { title: 'CD' }, yaxis: { title: 'CL' }, yaxis2: { title: 'L/D', overlaying: 'y', side: 'right', gridcolor: 'rgba(0,0,0,0)' } }), CFG);
+
+      // chart: power
+      Plotly.react('c-power', [
+        { x: V, y: perf.curve.map((p) => p.powerReq), name: 'P requerida (W)', line: { color: A, width: 2.4 } },
+        { x: V, y: perf.curve.map((p) => p.thrustAvail * p.V), name: 'P disponible (W)', line: { color: G, width: 2.4 } },
+      ], L({ xaxis: { title: 'V (m/s)' }, yaxis: { title: 'W' } }), CFG);
+
+      // chart: spanwise lift distribution (normalized ccl) + elliptical reference
+      const r = solveLLT(w, 5);
+      const yN = r.station.y.map((y) => y / (w.span / 2));
+      const cclMax = Math.max(...r.station.ccl);
+      const ccln = r.station.ccl.map((v) => v / cclMax);
+      const ell = yN.map((y) => Math.sqrt(Math.max(0, 1 - y * y)));
+      Plotly.react('c-span', [
+        { x: yN, y: ccln, name: 'carga real (c·cl)', line: { color: A, width: 2.4 } },
+        { x: yN, y: ell, name: 'elíptica ideal', line: { color: C, width: 1.6, dash: 'dash' } },
+      ], L({ xaxis: { title: 'y / (b/2)', range: [0, 1] }, yaxis: { title: 'carga norm.', range: [0, 1.05] } }), CFG);
+
+      // chart: CL & L/D vs alpha
+      Plotly.react('c-cla', [
+        { x: polar.points.map((p) => p.alphaDeg), y: polar.points.map((p) => p.CL), name: 'CL', line: { color: A, width: 2.4 } },
+        { x: polar.points.map((p) => p.alphaDeg), y: polar.points.map((p) => p.LD), name: 'L/D', line: { color: C, width: 2 }, yaxis: 'y2' },
+      ], L({ xaxis: { title: 'α (°)' }, yaxis: { title: 'CL' }, yaxis2: { title: 'L/D', overlaying: 'y', side: 'right', gridcolor: 'rgba(0,0,0,0)' } }), CFG);
+
+      lastPolar = { polar, perf };
+    }
+
+    function renderWarn(list: string[]) {
+      const c = $('warn');
+      if (!list.length) { c.innerHTML = ''; return; }
+      c.innerHTML = list.map((m) => `<div class="card flex items-start gap-2.5 border-warning/40 bg-warning/5 p-3 text-[12px] text-warning"><svg class="mt-0.5 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><span>${m}</span></div>`).join('');
+    }
+
+    // ---- propulsion equation import ----
+    $('btn-import').addEventListener('click', () => ($('imp-file') as HTMLInputElement).click());
+    ($('imp-file') as HTMLInputElement).addEventListener('change', (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const j = JSON.parse(reader.result as string);
+          const coeffs = j?.polynomial?.coeffs;
+          if (!Array.isArray(coeffs)) throw new Error('sin coeficientes');
+          const isThrust = (j.curve || '').includes('thrust') || (j.output?.unit === 'N');
+          thrust = { coeffs, vMax: j?.input?.max ?? 32 };
+          thrustLabel = (j.curve || 'importado');
+          $('imp-info').innerHTML = isThrust
+            ? `<span class="text-success font-medium">Ecuación importada:</span> ${j.curve} · orden ${j.polynomial.order} · V≤${(j.input?.max ?? 32).toFixed(0)} m/s · gas ${(j.throttle != null ? (j.throttle * 100).toFixed(0) + '%' : '—')}`
+            : `<span class="text-warning font-medium">Aviso:</span> la curva importada (${j.curve}) no es empuje en N; el lazo puede no tener sentido físico.`;
+          compute();
+        } catch (err) {
+          $('imp-info').innerHTML = `<span class="text-danger font-medium">Error</span> al leer el JSON: ${(err as Error).message}`;
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    function exportCSV() {
+      if (!lastPolar) return;
+      let csv = 'alpha_deg,CL,CDi,CD0,CD,LD\n';
+      for (const p of lastPolar.polar.points)
+        csv += `${p.alphaDeg.toFixed(2)},${p.CL.toFixed(4)},${p.CDi.toFixed(5)},${p.CD0.toFixed(5)},${p.CD.toFixed(5)},${p.LD.toFixed(2)}\n`;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+      a.download = 'drag_polar.csv'; a.click(); URL.revokeObjectURL(a.href);
+    }
+    $('btn-csv').addEventListener('click', exportCSV);
+
+    document.querySelectorAll('input').forEach((el) => el.addEventListener('input', compute));
+    window.addEventListener('themechange', () => compute());
+    compute();
+  </script>
+</AppShell>

@@ -1,0 +1,63 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+const prompts = [
+  '¿Qué hélice maximiza la autonomía con el GT2826 en 4S?',
+  '¿Cómo bajo la corriente media de crucero por debajo de 10 A?',
+  '¿Qué cambios suben más mi puntuación en la ronda de carga?',
+  '¿Qué batería elijo para 12 min de vuelo con 1.5 kg de empuje?',
+];
+const capabilities = [
+  ['Selección de componentes', 'Recomienda motor, hélice, batería y ESC según objetivos y reglamento.'],
+  ['Optimización de autonomía', 'Propone configuraciones del Propulsion Designer que maximizan endurance/alcance.'],
+  ['Estrategia de competición', 'Analiza tu diseño contra el modelo de puntuación y sugiere las mejoras de mayor impacto.'],
+  ['Aerodinámica', 'Orienta sobre perfil, alargamiento y carga alar a partir de los resultados de CFD Studio.'],
+];
+---
+<AppShell title="AI Copilot" subtitle="Copiloto de ingeniería · razona sobre los datos reales de tu proyecto">
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight">AI Copilot</h1>
+      <p class="text-[13px] text-muted">Asistente que conecta propulsión, competición y aerodinámica.</p>
+    </div>
+    <span class="badge">Roadmap</span>
+  </div>
+
+  <div class="grid gap-5 lg:grid-cols-[1fr_320px]">
+    <div class="card flex flex-col overflow-hidden" style="min-height:420px">
+      <div class="flex-1 space-y-4 p-5">
+        <div class="flex gap-3">
+          <div class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface2 text-xs font-semibold">RG</div>
+          <div class="rounded-2xl rounded-tl-sm bg-surface2 px-4 py-2.5 text-[13px]">¿Qué hélice me da más empuje sin pasarme de 47 A con el motor del XC26?</div>
+        </div>
+        <div class="flex gap-3">
+          <div class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent text-accent-fg"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 2 19h20L12 2z"/></svg></div>
+          <div class="rounded-2xl rounded-tl-sm border border-border bg-surface px-4 py-2.5 text-[13px] leading-relaxed text-muted">
+            Con el <b class="text-fg">GT2826 1090KV en 4S</b>, la <b class="text-fg">APC 10x5</b> queda justo en el límite (~48 A, ~2.3 kg). Para ganar margen térmico sin sobrecorriente, baja a <b class="text-fg">10x4.7</b> o reduce a 3S. Subir a 11x5.5 te dispara a ~62 A → fuera de límite.
+            <span class="mt-2 block text-[11px] text-subtle">↳ generado por el modelo del Propulsion Designer</span>
+          </div>
+        </div>
+      </div>
+      <div class="border-t border-border p-3">
+        <div class="flex items-center gap-2 rounded-xl border border-border bg-surface2 px-3 py-2">
+          <input disabled placeholder="Pregunta al copiloto… (próximamente)" class="flex-1 bg-transparent text-[13px] outline-none placeholder:text-subtle" />
+          <button class="btn btn-primary !py-1.5" disabled>Enviar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <div class="card p-4">
+        <div class="mb-2 text-[12px] font-semibold">Preguntas de ejemplo</div>
+        <div class="space-y-1.5">
+          {prompts.map((p) => (<div class="rounded-lg border border-border bg-surface2 px-3 py-2 text-[12px] text-muted">{p}</div>))}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-6 grid gap-3 sm:grid-cols-2">
+    {capabilities.map(([t, d]) => (
+      <div class="card p-4"><div class="text-[13px] font-semibold">{t}</div><p class="mt-1 text-[12px] leading-relaxed text-muted">{d}</p></div>
+    ))}
+  </div>
+</AppShell>

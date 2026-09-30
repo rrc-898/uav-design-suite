@@ -1,0 +1,53 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+const columns = [
+  { title: 'Backlog', items: [['Selección de perfil alar', 'Aero'], ['Modelo de costes', 'Gestión']] },
+  { title: 'En progreso', items: [['Tren propulsivo XC26', 'Propulsión'], ['Bahía de carga modular', 'Estructura']] },
+  { title: 'Revisión', items: [['Informe Técnico v2', 'Documentación']] },
+  { title: 'Hecho', items: [['Presupuesto de pesos', 'Gestión'], ['CAD fuselaje', 'Estructura']] },
+];
+const tagColor: Record<string,string> = { Aero:'cyan', Propulsión:'accent', Estructura:'warning', Gestión:'success', Documentación:'danger' };
+const features = [
+  ['Kanban + Gantt', 'Tableros, cronograma y roadmap con dependencias.'],
+  ['Wiki técnica', 'Documentación viva con versionado tipo Obsidian/Notion.'],
+  ['Hojas de cálculo', 'Tablas con fórmulas, filtros y gráficas compatibles con Excel.'],
+  ['Pizarras', 'Lienzo tipo Milanote: imágenes, PDFs, diagramas y comentarios.'],
+  ['Archivos', 'Drag & drop con versionado y previsualización.'],
+  ['Colaboración', 'Tiempo real, multiusuario y permisos por rol.'],
+];
+---
+<AppShell title="Team Hub" subtitle="Gestión de proyecto · Notion + Excel + Milanote + Trello en uno">
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight">Team Hub</h1>
+      <p class="text-[13px] text-muted">Espacio de trabajo del equipo. Vista previa del tablero Kanban.</p>
+    </div>
+    <span class="badge">Roadmap</span>
+  </div>
+
+  <!-- Kanban preview -->
+  <div class="mb-6 grid gap-3 md:grid-cols-4">
+    {columns.map((col) => (
+      <div class="card p-3">
+        <div class="mb-2.5 flex items-center justify-between px-1">
+          <span class="text-[12px] font-semibold">{col.title}</span>
+          <span class="badge !px-1.5">{col.items.length}</span>
+        </div>
+        <div class="space-y-2">
+          {col.items.map(([name, tag]) => (
+            <div class="rounded-lg border border-border bg-surface2 p-2.5">
+              <div class="text-[12px] font-medium">{name}</div>
+              <span class="badge mt-1.5" style={`color: rgb(var(--${tagColor[tag]})); border-color: rgb(var(--${tagColor[tag]}) / 0.3)`}>{tag}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+
+  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    {features.map(([t, d]) => (
+      <div class="card p-4"><div class="text-[13px] font-semibold">{t}</div><p class="mt-1 text-[12px] leading-relaxed text-muted">{d}</p></div>
+    ))}
+  </div>
+</AppShell>

@@ -1,0 +1,19 @@
+# build output
+dist/
+.output/
+# dependencies
+node_modules/
+# astro
+.astro/
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+# environment
+.env
+.env.production
+# macOS / editors
+.DS_Store
+.vscode/
+# reglamento oficial de la competición (no redistribuible desde aquí)
+XC_27_RT_V1.00.pdf

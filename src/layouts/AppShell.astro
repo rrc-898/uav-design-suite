@@ -1,0 +1,71 @@
+---
+import '../styles/global.css';
+import Sidebar from '../components/Sidebar.astro';
+
+interface Props { title?: string; subtitle?: string; }
+const { title = 'Dashboard', subtitle } = Astro.props;
+const path = Astro.url.pathname.replace(/\/+$/, '') || '/';
+---
+<!doctype html>
+<html lang="es" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title} · UAV Design Suite</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <script is:inline>
+      (() => {
+        const t = localStorage.getItem('uav-theme');
+        const dark = t ? t === 'dark' : true;
+        document.documentElement.classList.toggle('dark', dark);
+      })();
+    </script>
+  </head>
+  <body class="min-h-screen bg-bg text-fg font-sans">
+    <div class="flex min-h-screen">
+      <Sidebar path={path} />
+
+      <div class="flex min-w-0 flex-1 flex-col">
+        <!-- Top bar -->
+        <header class="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-bg/80 px-4 backdrop-blur lg:px-6">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 text-[13px] text-subtle">
+              <span class="font-mono">~/</span>
+              <span class="truncate font-medium text-fg">{title}</span>
+            </div>
+            {subtitle && <div class="truncate text-[11px] text-subtle">{subtitle}</div>}
+          </div>
+
+          <div class="hidden items-center gap-1.5 rounded-lg border border-border bg-surface2 px-2.5 py-1.5 text-[12px] text-subtle md:flex">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <span>Buscar</span><span class="kbd ml-2">⌘K</span>
+          </div>
+
+          <button id="theme-toggle" class="btn h-9 w-9 !px-0" aria-label="Cambiar tema" title="Cambiar tema">
+            <svg class="hidden dark:block" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg>
+            <svg class="block dark:hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+          </button>
+        </header>
+
+        <main class="relative flex-1">
+          <div class="app-grid pointer-events-none absolute inset-x-0 top-0 h-64"></div>
+          <div class="relative mx-auto w-full max-w-7xl px-4 py-6 lg:px-8 lg:py-8">
+            <slot />
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script is:inline>
+      document.getElementById('theme-toggle')?.addEventListener('click', () => {
+        const dark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('uav-theme', dark ? 'dark' : 'light');
+        window.dispatchEvent(new CustomEvent('themechange', { detail: { dark } }));
+      });
+    </script>
+  </body>
+</html>

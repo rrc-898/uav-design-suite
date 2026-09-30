@@ -1,0 +1,975 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+import { XC27_LIMITS, XC27_FIELD } from '../lib/xc27';
+import { xc27Catalog } from '../lib/xc27-study';
+
+const cat = xc27Catalog();
+const tabs = [
+  ['ronda', 'Ronda simulada'],
+  ['carga', 'Carga de pago'],
+  ['propulsion', 'Modelo de empuje'],
+  ['estructura', 'Estructura'],
+  ['estabilidad', 'Centrado y estabilidad'],
+  ['caja', 'Caja, bahía y planos'],
+];
+---
+<AppShell title="Estudio de avión XC27" subtitle="Un avión concreto frente a la ronda 2027 · prestaciones, carga, estructura, estabilidad y caja">
+  <script is:inline src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight">Estudio de avión · XtraChallenge 2027</h1>
+      <p class="max-w-2xl text-[13px] text-muted">
+        Define el avión y vuela la ronda completa: despegue, ascenso de 60 s, planeo, pitstop y pilones.
+        Cada pestaña responde a un apartado del informe técnico con la misma física que el optimizador.
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <button id="btn-to-calc" class="btn" title="Lleva las cifras simuladas a la calculadora de ronda">Enviar a la calculadora</button>
+      <button id="btn-json" class="btn">Exportar JSON</button>
+      <button id="btn-reset" class="btn">Restablecer</button>
+      <a href="/xc27" class="btn">Reglamento</a>
+    </div>
+  </div>
+
+  <div class="grid gap-5 xl:grid-cols-[340px_1fr]">
+    <!-- ==================== ENTRADAS ==================== -->
+    <aside class="space-y-4 xl:sticky xl:top-20 xl:self-start xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto xl:pr-1">
+      <div class="card p-4">
+        <div class="mb-3 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Célula</div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div class="col-span-2">
+            <label class="field-label">Perfil alar</label>
+            <select id="s-airfoil" class="field">{cat.airfoils.map((a) => <option value={a.id}>{a.name}{a.reflex ? ' · ala volante' : ''}</option>)}</select>
+          </div>
+          <div><label class="field-label">Envergadura (m)</label><input id="s-span" type="number" step="0.05" min="0.6" class="field" /></div>
+          <div><label class="field-label">Alargamiento AR</label><input id="s-ar" type="number" step="0.5" min="3" class="field" /></div>
+          <div><label class="field-label">Estrechamiento λ</label><input id="s-taper" type="number" step="0.05" min="0.3" max="1" class="field" /></div>
+          <div><label class="field-label">Torsión punta (°)</label><input id="s-washout" type="number" step="0.5" class="field" /></div>
+          <div>
+            <label class="field-label">Construcción</label>
+            <select id="s-build" class="field">
+              <option value="0.78">Fibra de carbono (−22 %)</option>
+              <option value="1">Mixta balsa/composite</option>
+              <option value="1.2">Conservadora (+20 %)</option>
+            </select>
+          </div>
+          <div><label class="field-label" title="Masa real en vacío, sin arroz. 0 = estimarla">Vacío pesado (g)</label><input id="s-empty" type="number" step="10" min="0" class="field" /></div>
+        </div>
+        <div id="planform" class="mt-3 rounded-lg border border-border bg-surface2 p-2"></div>
+        <div id="geo-line" class="mt-1.5 font-mono text-[10px] text-subtle"></div>
+      </div>
+
+      <div class="card p-4">
+        <div class="mb-3 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Planta motriz</div>
+        <div class="mb-2.5 rounded-lg border border-border bg-surface2 px-3 py-2 text-[12px]">
+          <div class="font-medium">{XC27_LIMITS.motorName}</div>
+          <div class="text-[10px] text-subtle">Motor obligatorio (§7.6) · ESC ≥ {XC27_LIMITS.escMinA} A · LiPo ≤ {XC27_LIMITS.maxCells}S</div>
+        </div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div class="col-span-2">
+            <label class="field-label">Hélice</label>
+            <select id="s-prop" class="field">{cat.props.map((p) => <option value={p.id}>{p.dia}×{p.pitch}" {p.brand}{p.folding ? ' · plegable' : ' · fija'}</option>)}</select>
+          </div>
+          <div class="col-span-2">
+            <label class="field-label">Batería principal</label>
+            <select id="s-battery" class="field">{cat.batteries.map((b) => <option value={b.id}>{b.brand} {b.series} · {b.capacityMah} mAh · {b.cRating}C · {b.massG} g</option>)}</select>
+          </div>
+          <div><label class="field-label">Packs en paralelo</label><input id="s-parallel" type="number" step="1" min="1" max="3" class="field" /></div>
+          <div>
+            <label class="field-label">ESC</label>
+            <select id="s-esc" class="field">{cat.escs.map((e) => <option value={e.id}>{e.brand} {e.name}</option>)}</select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-4">
+        <div class="mb-3 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Carga y día de vuelo</div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div class="col-span-2">
+            <div class="flex items-baseline justify-between"><label class="field-label" for="s-payload">Arroz transportado</label><span class="font-mono text-[11px]" id="s-payload-val">—</span></div>
+            <input id="s-payload" type="range" min="0" max="6000" step="25" class="w-full accent-accent" />
+          </div>
+          <div><label class="field-label">Elevación campo (m)</label><input id="e-elev" type="number" step="10" class="field" /></div>
+          <div><label class="field-label">Temperatura (°C)</label><input id="e-temp" type="number" step="1" class="field" /></div>
+          <div><label class="field-label">Viento (m/s)</label><input id="s-wind" type="number" step="0.5" min="0" max="6" class="field" /></div>
+          <div><label class="field-label">Reserva batería (%)</label><input id="s-reserve" type="number" step="5" min="0" max="60" class="field" /></div>
+        </div>
+        <div class="mt-2 font-mono text-[11px] text-subtle">ρ = <span id="e-rho" class="text-fg">—</span> kg/m³ <span class="text-subtle">· {XC27_FIELD.name}: ~{XC27_FIELD.elevationM} m</span></div>
+      </div>
+
+      <div class="card p-4">
+        <div class="mb-3 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Estrategia de ronda</div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div><label class="field-label" title="P_equipo de la mejor marca de la ronda">P_max de referencia</label><input id="x-pmax" type="number" step="0.1" class="field" /></div>
+          <div>
+            <label class="field-label">Unidad de P_CA</label>
+            <select id="x-unit" class="field"><option value="kg">kg (§9.5.4)</option><option value="g">gramos</option></select>
+          </div>
+          <div><label class="field-label">Techo de ascenso (m)</label><input id="x-ceiling" type="number" step="5" max="120" class="field" /></div>
+          <div><label class="field-label">Fin de planeo (m)</label><input id="x-glideend" type="number" step="1" min="10" class="field" /></div>
+          <div><label class="field-label">Eficacia de ascenso</label><input id="x-climbeff" type="number" step="0.05" min="0.3" max="1" class="field" /></div>
+          <div><label class="field-label">Eficacia de planeo</label><input id="x-glidef" type="number" step="0.05" min="0.3" max="1" class="field" /></div>
+          <div><label class="field-label">Margen de despegue ×</label><input id="x-tomargin" type="number" step="0.05" min="1" class="field" /></div>
+          <div><label class="field-label">g máx en pilones</label><input id="x-maxg" type="number" step="0.5" min="1.5" class="field" /></div>
+          <div><label class="field-label">Metros de más por viraje</label><input id="x-overshoot" type="number" step="2" min="0" class="field" /></div>
+          <div><label class="field-label">Ascenso tras pitstop (s)</label><input id="x-climb2" type="number" step="5" min="5" max="60" class="field" /></div>
+          <div><label class="field-label">Carga/descarga base (s)</label><input id="x-loadbase" type="number" step="1" class="field" /></div>
+          <div><label class="field-label">Caudal de arroz (g/s)</label><input id="x-loadrate" type="number" step="10" class="field" /></div>
+          <div class="col-span-2"><label class="field-label" title="0.9 = llevar el 90 % de lo declarado">Transportada / declarada</label><input id="x-carry" type="number" step="0.01" min="0.5" max="1" class="field" /></div>
+        </div>
+        <div class="mt-2.5 space-y-1">
+          <label class="flex items-center gap-2 text-[12px] text-muted"><input id="x-beyond" type="checkbox" class="accent-accent" /> Seguir subiendo tras los 60 s</label>
+          <label class="flex items-center gap-2 text-[12px] text-muted"><input id="x-extpilot" type="checkbox" class="accent-accent" /> Piloto externo (−25 %)</label>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ==================== RESULTADOS ==================== -->
+    <section class="min-w-0 space-y-5">
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="card p-4 ring-1 ring-accent/30">
+          <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Puntos de la ronda</div>
+          <div class="mt-1 font-mono text-3xl font-semibold tabular" id="k-points">—</div>
+          <div class="text-[11px] text-subtle" id="k-points-sub">—</div>
+        </div>
+        <div class="card p-4">
+          <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Masas</div>
+          <div class="mt-1 font-mono text-lg font-semibold" id="k-mass">—</div>
+          <div class="text-[11px] text-subtle" id="k-mass-sub">—</div>
+        </div>
+        <div class="card p-4">
+          <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Carga que más puntúa</div>
+          <div class="mt-1 font-mono text-lg font-semibold" id="k-best">—</div>
+          <div class="text-[11px] text-subtle" id="k-best-sub">—</div>
+        </div>
+        <div class="card p-4">
+          <div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Caja de transporte</div>
+          <div class="mt-1 font-mono text-lg font-semibold" id="k-box">—</div>
+          <div class="text-[11px] text-subtle" id="k-box-sub">—</div>
+        </div>
+      </div>
+
+      <div id="notes" class="space-y-2"></div>
+
+      <div class="flex gap-1 overflow-x-auto border-b border-border" role="tablist">
+        {tabs.map(([id, label]) => (
+          <button data-tab={id} role="tab" class="tab-btn whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-[13px] font-medium text-muted transition hover:text-fg">{label}</button>
+        ))}
+      </div>
+
+      <!-- ---------- RONDA ---------- -->
+      <div data-panel="ronda" class="space-y-5">
+        <div id="phase-cards" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"></div>
+        <div class="card overflow-hidden">
+          <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Puntuación oficial §9.5 con la ronda simulada</div>
+          <div id="score-cells" class="grid grid-cols-2 gap-px bg-border sm:grid-cols-4"></div>
+          <div id="score-formula" class="border-t border-border px-4 py-3 font-mono text-[11px] leading-relaxed text-subtle"></div>
+        </div>
+        <div class="grid gap-3 lg:grid-cols-2">
+          <div class="card min-w-0 overflow-hidden p-3"><div class="mb-1 px-1 text-[12px] font-semibold">Perfil de la ronda <span class="font-normal text-subtle">— altitud frente al tiempo</span></div><div id="c-profile" class="h-64"></div></div>
+          <div class="card overflow-hidden">
+            <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Batería: una sola para toda la ronda</div>
+            <div class="p-4">
+              <div id="energy-bar" class="flex h-3 overflow-hidden rounded-full bg-surface2"></div>
+              <div id="energy-rows" class="mt-3 space-y-1 text-[12px]"></div>
+            </div>
+          </div>
+        </div>
+        <div class="card overflow-hidden">
+          <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Reparto de masas</div>
+          <div class="p-4">
+            <div id="mass-bar" class="flex h-3 overflow-hidden rounded-full bg-surface2"></div>
+            <div id="mass-legend" class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- CARGA ---------- -->
+      <div data-panel="carga" class="hidden space-y-5">
+        <div class="card min-w-0 overflow-hidden p-3">
+          <div class="mb-1 flex flex-wrap items-center justify-between gap-2 px-1">
+            <div class="text-[12px] font-semibold">Puntos de ronda frente al arroz transportado</div>
+            <button id="btn-use-best" class="btn !py-1 text-[11px]">Usar la carga que más puntúa</button>
+          </div>
+          <div id="c-sweep" class="h-72"></div>
+          <p class="px-1 pt-1 text-[11px] leading-relaxed text-subtle">
+            Los escalones son las marcas de despegue: cada vez que la carrera (con su margen) pasa de 20 a 40 m o de 40 a 60 m se pierde un 12.5 % de toda la ronda.
+            A la derecha de la última marca el avión ya no sale de la pista.
+          </p>
+        </div>
+        <div class="card overflow-hidden">
+          <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">La mejor carga para cada marca de despegue</div>
+          <div class="overflow-x-auto">
+            <table class="w-full min-w-[620px] text-[12px]">
+              <thead class="text-left text-[10px] uppercase tracking-wide text-subtle"><tr class="border-b border-border">
+                <th class="px-4 py-2 font-semibold">Marca</th><th class="px-3 py-2 text-right font-semibold">Carga</th><th class="px-3 py-2 text-right font-semibold">MTOW</th>
+                <th class="px-3 py-2 text-right font-semibold">Carrera</th><th class="px-3 py-2 text-right font-semibold">A 60 s</th><th class="px-3 py-2 text-right font-semibold">Planeo</th>
+                <th class="px-3 py-2 text-right font-semibold">P_equipo</th><th class="px-4 py-2 text-right font-semibold">Puntos</th>
+              </tr></thead>
+              <tbody id="mark-table" class="divide-y divide-border font-mono tabular"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card overflow-hidden">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface2/50 px-4 py-2.5">
+            <span class="text-[12px] font-semibold">Predicción de carga frente a la densidad del aire <span class="font-normal text-subtle">— obligatoria en el informe, §6.2</span></span>
+            <div class="flex items-center gap-2 text-[11px] text-muted">
+              <label for="p-mark">Marca</label>
+              <select id="p-mark" class="field !w-auto !py-1 text-[12px]"><option value="20">20 m</option><option value="40" selected>40 m</option><option value="60">60 m</option></select>
+              <label for="p-alt" title="Altitud mínima exigida a los 60 s">A₆₀ mín (m)</label>
+              <input id="p-alt" type="number" step="5" value="60" class="field !w-16 !py-1 text-right text-[12px]" />
+            </div>
+          </div>
+          <div class="grid gap-0 lg:grid-cols-[1fr_280px]">
+            <div class="min-w-0 overflow-hidden p-3"><div id="c-pred" class="h-64"></div></div>
+            <div class="space-y-3 border-t border-border p-4 text-[12px] lg:border-l lg:border-t-0">
+              <div><div class="text-[10px] uppercase tracking-wide text-subtle">Ecuación de predicción</div><div id="p-eq" class="mt-1 rounded-lg bg-surface2 p-2 font-mono text-[12px]">—</div></div>
+              <div class="flex justify-between"><span class="text-muted">R² del ajuste</span><span id="p-r2" class="font-mono">—</span></div>
+              <div class="flex justify-between"><span class="text-muted">A la densidad de hoy</span><span id="p-today" class="font-mono">—</span></div>
+              <div class="flex justify-between"><span class="text-muted">Volumen de arroz</span><span id="p-vol" class="font-mono">—</span></div>
+              <p class="text-[11px] leading-relaxed text-subtle">
+                Criterio: despegar dentro de la marca con el margen de la estrategia y alcanzar la altitud mínima a los 60 s.
+                La carga que se declare aquí es la que entra en P_CA; en la ronda hay que llevar al menos el 90 %.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- PROPULSIÓN ---------- -->
+      <div data-panel="propulsion" class="hidden space-y-5">
+        <div class="grid gap-3 sm:grid-cols-4" id="prop-kpis"></div>
+        <div class="card min-w-0 overflow-hidden p-3"><div class="mb-1 px-1 text-[12px] font-semibold">Empuje disponible y requerido <span class="font-normal text-subtle">— cargado y descargado</span></div><div id="c-thrust" class="h-72"></div></div>
+        <div class="card overflow-hidden">
+          <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Expresión del empuje para el informe <span class="font-normal text-subtle">— «Modelo de empuje», 10 pts</span></div>
+          <div class="space-y-3 p-4 text-[12px]">
+            <div id="t-eq" class="overflow-x-auto rounded-lg bg-surface2 p-3 font-mono text-[12px]">—</div>
+            <p id="t-note" class="leading-relaxed text-muted"></p>
+            <p class="rounded-lg border border-warning/40 bg-warning/5 p-2.5 text-[11px] leading-relaxed text-warning">
+              Esta hélice tiene que figurar en el informe técnico: no se permite volar con una hélice no declarada (§7.6), y no se puede cambiar de modelo en el pitstop (§8.6).
+              Los parámetros eléctricos del motor son estimados: valida el modelo con un ensayo de empuje estático en banco.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- ESTRUCTURA ---------- -->
+      <div data-panel="estructura" class="hidden space-y-5">
+        <div class="card p-4">
+          <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            <div><label class="field-label">Factor de carga límite n⁺</label><input id="v-npos" type="number" step="0.1" min="2" class="field" /></div>
+            <div><label class="field-label">Factor de carga límite n⁻</label><input id="v-nneg" type="number" step="0.1" max="0" class="field" /></div>
+            <div><label class="field-label">Ráfaga de cálculo (m/s)</label><input id="v-gust" type="number" step="0.5" min="0" class="field" /></div>
+            <div><label class="field-label">Coeficiente de seguridad</label><input id="v-sf" type="number" step="0.1" min="1" class="field" /></div>
+          </div>
+        </div>
+        <div class="grid gap-3 lg:grid-cols-2">
+          <div class="card min-w-0 overflow-hidden p-3"><div class="mb-1 px-1 text-[12px] font-semibold">Diagrama de maniobras V-n <span class="font-normal text-subtle">— cargado</span></div><div id="c-vn" class="h-72"></div></div>
+          <div class="card min-w-0 overflow-hidden p-3"><div class="mb-1 px-1 text-[12px] font-semibold">Momento flector a lo largo de la semiala <span class="font-normal text-subtle">— al factor límite</span></div><div id="c-bend" class="h-72"></div></div>
+        </div>
+        <div id="vn-cells" class="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4"></div>
+        <div class="card overflow-hidden">
+          <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Flexión del ala y ensayo prevuelo <span class="font-normal text-subtle">— §7.9: dos personas levantan el avión cargado por las puntas</span></div>
+          <div id="bend-cells" class="grid grid-cols-2 gap-px bg-border sm:grid-cols-4"></div>
+          <div class="overflow-x-auto border-t border-border">
+            <table class="w-full min-w-[560px] text-[12px]">
+              <thead class="text-left text-[10px] uppercase tracking-wide text-subtle"><tr class="border-b border-border">
+                <th class="px-4 py-2 font-semibold">Material del cordón</th><th class="px-3 py-2 text-right font-semibold">σ adm. (MPa)</th>
+                <th class="px-3 py-2 text-right font-semibold">Área por cordón</th><th class="px-3 py-2 text-right font-semibold">Masa de cordones</th>
+                <th class="px-4 py-2 text-right font-semibold">Flecha en el ensayo</th>
+              </tr></thead>
+              <tbody id="spar-table" class="divide-y divide-border font-mono tabular"></tbody>
+            </table>
+          </div>
+          <div id="bend-note" class="border-t border-border px-4 py-3 text-[11px] leading-relaxed text-subtle"></div>
+        </div>
+      </div>
+
+      <!-- ---------- ESTABILIDAD ---------- -->
+      <div data-panel="estabilidad" class="hidden space-y-5">
+        <div id="stab-cells" class="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4"></div>
+        <div class="card p-3">
+          <div class="mb-1 flex items-center justify-between px-1">
+            <div class="text-[12px] font-semibold">Vista lateral: masas, centro de gravedad y punto neutro</div>
+            <button id="btn-auto-layout" class="btn !py-1 text-[11px]">Recolocar automáticamente</button>
+          </div>
+          <div id="side-view"></div>
+        </div>
+        <div id="stab-notes" class="space-y-2"></div>
+        <div class="grid gap-5 lg:grid-cols-2">
+          <div class="card p-4">
+            <div class="mb-3 text-[13px] font-semibold">Geometría <span class="font-normal text-subtle text-[11px]">— metros desde el morro</span></div>
+            <div class="grid grid-cols-2 gap-2.5">
+              <div><label class="field-label">Longitud de fuselaje</label><input data-geo="fuseLengthM" type="number" step="0.01" class="field" /></div>
+              <div><label class="field-label">Ancho de fuselaje</label><input data-geo="fuseWidthM" type="number" step="0.005" class="field" /></div>
+              <div><label class="field-label">Borde de ataque del ala</label><input data-geo="wingLeM" type="number" step="0.005" class="field" /></div>
+              <div><label class="field-label" title="Cota del plano: de borde de ataque del ala al del estabilizador">BA ala → BA estabilizador</label><input data-geo="tailArmLeM" type="number" step="0.01" class="field" /></div>
+              <div><label class="field-label">Envergadura estab. horizontal</label><input data-geo="hSpanM" type="number" step="0.01" class="field" /></div>
+              <div><label class="field-label">Cuerda estab. horizontal</label><input data-geo="hChordM" type="number" step="0.005" class="field" /></div>
+              <div><label class="field-label">Altura estab. vertical</label><input data-geo="vHeightM" type="number" step="0.01" class="field" /></div>
+              <div><label class="field-label">Cuerda raíz vertical</label><input data-geo="vRootM" type="number" step="0.005" class="field" /></div>
+              <div><label class="field-label">Cuerda punta vertical</label><input data-geo="vTipM" type="number" step="0.005" class="field" /></div>
+            </div>
+          </div>
+          <div class="card overflow-hidden">
+            <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Distribución de masas</div>
+            <table class="w-full text-[12px]">
+              <thead class="text-left text-[10px] uppercase tracking-wide text-subtle"><tr class="border-b border-border">
+                <th class="px-4 py-2 font-semibold">Elemento</th><th class="px-2 py-2 text-right font-semibold">Masa (g)</th><th class="px-4 py-2 text-right font-semibold">Posición (m)</th>
+              </tr></thead>
+              <tbody id="mass-table" class="divide-y divide-border"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- CAJA ---------- -->
+      <div data-panel="caja" class="hidden space-y-5">
+        <div class="grid gap-5 lg:grid-cols-2">
+          <div class="card overflow-hidden">
+            <div class="flex items-center justify-between border-b border-border bg-surface2/50 px-4 py-2.5">
+              <span class="text-[12px] font-semibold">Caja de transporte <span class="font-normal text-subtle">— §7.3: alto + ancho + largo ≤ {XC27_LIMITS.boxSumMm} mm</span></span>
+              <button id="btn-min-box" class="btn !py-1 text-[11px]">Caja mínima</button>
+            </div>
+            <div class="grid grid-cols-3 gap-2.5 p-4">
+              <div><label class="field-label">Largo (mm)</label><input data-box="lengthMm" type="number" step="10" class="field" /></div>
+              <div><label class="field-label">Ancho (mm)</label><input data-box="widthMm" type="number" step="10" class="field" /></div>
+              <div><label class="field-label">Alto (mm)</label><input data-box="heightMm" type="number" step="10" class="field" /></div>
+              <div><label class="field-label">Paneles de ala</label><input data-box="wingPanels" type="number" step="1" min="1" max="6" class="field" /></div>
+              <div><label class="field-label">Tramos de fuselaje</label><input data-box="fusePieces" type="number" step="1" min="1" max="3" class="field" /></div>
+              <div class="flex items-end"><div id="box-sum" class="w-full rounded-lg bg-surface2 px-3 py-2 text-center font-mono text-[12px]">—</div></div>
+            </div>
+            <div id="box-parts" class="divide-y divide-border border-t border-border text-[12px]"></div>
+            <div id="box-notes" class="space-y-2 border-t border-border p-4"></div>
+          </div>
+
+          <div class="space-y-5">
+            <div class="card overflow-hidden">
+              <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Bahía de arroz <span class="font-normal text-subtle">— §7.8: a granel, {XC27_LIMITS.riceDensityKgL} kg/L, cerrada</span></div>
+              <div id="rice-cells" class="grid grid-cols-3 gap-px bg-border"></div>
+              <div id="rice-note" class="border-t border-border px-4 py-3 text-[11px] leading-relaxed text-subtle"></div>
+            </div>
+            <div class="card overflow-hidden">
+              <div class="border-b border-border bg-surface2/50 px-4 py-2.5 text-[12px] font-semibold">Caja de telemetría <span class="font-normal text-subtle">— §7.7.1 y §12.1</span></div>
+              <ul class="space-y-1 p-4 text-[11px] leading-relaxed text-muted">
+                <li>· {XC27_LIMITS.telemetryBox.lengthMm} × {XC27_LIMITS.telemetryBox.widthMm} × {XC27_LIMITS.telemetryBox.heightMm} mm y {XC27_LIMITS.telemetryBox.massG} g, ya incluidos en la masa en vacío.</li>
+                <li>· Se atornilla desde arriba con dos M3 (agujeros de Ø 3.2 mm a 45 mm del frontal): hacen falta dos roscas M3 debajo.</li>
+                <li>· Dos XT60 en el frontal: entrada de batería y salida al ESC. Va en serie con la batería principal.</li>
+                <li>· Cielo despejado sobre la tapa: nada por encima de un plano a 20° desde sus aristas superiores.</li>
+                <li>· Lleva el conector de armado que hay que quitar antes de tocar el avión en el pitstop.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card overflow-hidden">
+          <div class="flex items-center justify-between border-b border-border bg-surface2/50 px-4 py-2.5">
+            <span class="text-[12px] font-semibold">Datos para el plano de 3 vistas <span class="font-normal text-subtle">— cotas y tabla que exige §6.3</span></span>
+            <button id="btn-copy-table" class="btn !py-1 text-[11px]">Copiar</button>
+          </div>
+          <div id="drawing-table" class="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-3"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    import { XC27_LIMITS, XC27_FIELD, airDensityAt, riceVolumeL, drawingToleranceMm } from '../lib/xc27';
+    import { XC27_DEFAULT_STRATEGY, type Xc27Strategy } from '../lib/xc27-flight';
+    import {
+      XC27_DEFAULT_SPEC, studyXc27, payloadSweep, payloadPrediction, thrustModel, roundProfile, vnDiagram, wingBending,
+      defaultLayout, stabilityOf, riceBay, boxCheck, suggestedBox,
+      type Xc27Spec, type Xc27Study, type Layout, type BoxSpec, type PayloadSweep,
+    } from '../lib/xc27-study';
+    import { rootChordOf, macOf, packWh } from '../lib/design';
+    import { plot, rgb, rgba, vline, hline, css } from '../lib/plot';
+
+    const $ = (id: string) => document.getElementById(id)!;
+    const num = (id: string) => parseFloat(($(id) as HTMLInputElement).value) || 0;
+    const val = (id: string) => ($(id) as HTMLInputElement | HTMLSelectElement).value;
+    const chk = (id: string) => ($(id) as HTMLInputElement).checked;
+    const setVal = (id: string, v: string | number) => { ($(id) as HTMLInputElement).value = String(v); };
+    const f = (v: number, d = 1) => (Number.isFinite(v) ? v.toFixed(d) : '—');
+    const G = 9.80665;
+
+    // ---------------- estado ----------------
+    interface Env { elevM: number; tempC: number; }
+    interface Struct { nPos: number; nNeg: number; gust: number; sf: number; }
+    interface LayoutEdit { geo: Partial<Record<keyof Layout, number>>; x: Record<string, number>; }
+    interface Saved { spec: Xc27Spec; strategy: Xc27Strategy; env?: Env; struct?: Struct; layout?: LayoutEdit | null; box?: BoxSpec | null; }
+
+    const KEY = 'xc27-aircraft';
+    const DEFAULT_ENV: Env = { elevM: XC27_FIELD.elevationM, tempC: XC27_FIELD.julyTempC };
+    let spec: Xc27Spec = { ...XC27_DEFAULT_SPEC };
+    let strategy: Xc27Strategy = { ...XC27_DEFAULT_STRATEGY };
+    let env: Env = { ...DEFAULT_ENV };
+    let struct: Struct = { nPos: 3.8, nNeg: -1.5, gust: 5, sf: 1.5 };
+    let layoutEdit: LayoutEdit | null = null;   // null = disposición automática
+    let boxEdit: BoxSpec | null = null;         // null = caja mínima
+
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) {
+        const s = JSON.parse(raw) as Saved;
+        spec = { ...spec, ...s.spec };
+        strategy = { ...strategy, ...s.strategy };
+        // un diseño que llega del Mission Simulator trae su densidad, no el campo
+        if (s.env) env = { ...env, ...s.env }; else env = { elevM: 0, tempC: 0 };
+        if (s.struct) struct = { ...struct, ...s.struct };
+        layoutEdit = s.layout ?? null; boxEdit = s.box ?? null;
+      }
+    } catch { /* sin almacenamiento */ }
+    const hasEnv = () => env.elevM !== 0 || env.tempC !== 0;
+    const save = () => {
+      try { localStorage.setItem(KEY, JSON.stringify({ spec, strategy, env, struct, layout: layoutEdit, box: boxEdit } satisfies Saved)); } catch { /* idem */ }
+    };
+
+    function writeInputs() {
+      setVal('s-airfoil', spec.airfoilId); setVal('s-span', spec.spanM); setVal('s-ar', spec.aspectRatio);
+      setVal('s-taper', spec.taper); setVal('s-washout', spec.washoutDeg);
+      setVal('s-build', spec.buildFactor <= 0.9 ? '0.78' : spec.buildFactor >= 1.1 ? '1.2' : '1');
+      setVal('s-empty', spec.emptyMassG);
+      setVal('s-prop', spec.propId); setVal('s-battery', spec.batteryId); setVal('s-parallel', spec.parallel); setVal('s-esc', spec.escId);
+      setVal('s-payload', spec.payloadG); setVal('s-wind', spec.windMs); setVal('s-reserve', spec.reservePct);
+      if (!hasEnv()) {
+        // densidad heredada: se busca la temperatura que la reproduce a la elevación del campo
+        env = { elevM: XC27_FIELD.elevationM, tempC: Math.round(airDensityAt(XC27_FIELD.elevationM, 0) * 273.15 / spec.rho - 273.15) };
+      }
+      setVal('e-elev', env.elevM); setVal('e-temp', env.tempC);
+      const s = strategy;
+      setVal('x-pmax', s.pMaxRef); setVal('x-unit', s.payloadUnit); setVal('x-ceiling', s.altCeilingM); setVal('x-glideend', s.glideEndAltM);
+      setVal('x-climbeff', s.climbEfficiency); setVal('x-glidef', s.glidePathFactor); setVal('x-tomargin', s.takeoffMargin);
+      setVal('x-maxg', s.pylonMaxG); setVal('x-overshoot', s.pylonOvershootM); setVal('x-climb2', s.climb2S);
+      setVal('x-loadbase', s.loadBaseS); setVal('x-loadrate', s.loadRateGs); setVal('x-carry', s.carryFraction);
+      ($('x-beyond') as HTMLInputElement).checked = s.climbBeyond60; ($('x-extpilot') as HTMLInputElement).checked = s.externalPilot;
+      setVal('v-npos', struct.nPos); setVal('v-nneg', struct.nNeg); setVal('v-gust', struct.gust); setVal('v-sf', struct.sf);
+    }
+
+    const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
+    function readInputs() {
+      env = { elevM: num('e-elev'), tempC: num('e-temp') };
+      spec = {
+        airfoilId: val('s-airfoil'), spanM: clamp(num('s-span'), 0.6, 4), aspectRatio: clamp(num('s-ar'), 3, 20),
+        taper: clamp(num('s-taper'), 0.3, 1), washoutDeg: num('s-washout'),
+        propId: val('s-prop'), batteryId: val('s-battery'), parallel: clamp(Math.round(num('s-parallel')), 1, 3), escId: val('s-esc'),
+        payloadG: Math.max(0, num('s-payload')), buildFactor: parseFloat(val('s-build')) || 1, emptyMassG: Math.max(0, num('s-empty')),
+        rho: airDensityAt(env.elevM, env.tempC), windMs: clamp(num('s-wind'), 0, 10), reservePct: clamp(num('s-reserve'), 0, 60),
+      };
+      strategy = {
+        ...strategy,
+        pMaxRef: Math.max(0.05, num('x-pmax')), payloadUnit: val('x-unit') as Xc27Strategy['payloadUnit'],
+        altCeilingM: clamp(num('x-ceiling'), 20, 120), glideEndAltM: Math.max(10, num('x-glideend')),
+        climbEfficiency: clamp(num('x-climbeff'), 0.3, 1), glidePathFactor: clamp(num('x-glidef'), 0.3, 1),
+        takeoffMargin: Math.max(1, num('x-tomargin')), pylonMaxG: Math.max(1.5, num('x-maxg')),
+        pylonOvershootM: Math.max(0, num('x-overshoot')), climb2S: clamp(num('x-climb2'), 5, 60),
+        loadBaseS: Math.max(0, num('x-loadbase')), loadRateGs: Math.max(1, num('x-loadrate')),
+        carryFraction: clamp(num('x-carry'), 0.5, 1), climbBeyond60: chk('x-beyond'), externalPilot: chk('x-extpilot'),
+      };
+      struct = { nPos: Math.max(1.5, num('v-npos')), nNeg: Math.min(0, num('v-nneg')), gust: Math.max(0, num('v-gust')), sf: Math.max(1, num('v-sf')) };
+    }
+
+    // ---------------- cálculo ----------------
+    let study: Xc27Study;
+    let sweep: PayloadSweep;
+    let layout: Layout;
+    let box: BoxSpec;
+    let activeTab = 'ronda';
+
+    function resolveLayout(): Layout {
+      const def = defaultLayout(study);
+      if (!layoutEdit) return def;
+      return {
+        ...def, ...(layoutEdit.geo as Partial<Layout>),
+        items: def.items.map((i) => ({ ...i, xM: layoutEdit!.x[i.id] ?? i.xM })),
+      };
+    }
+
+    function compute() {
+      study = studyXc27(spec, strategy);
+      sweep = payloadSweep(study, 40);
+      layout = resolveLayout();
+      box = boxEdit ?? suggestedBox(study, layout);
+      renderHeader();
+      renderTab();
+      // deja la ronda lista para la calculadora de /xc27
+      try { localStorage.setItem('xc27-round-from-study', JSON.stringify({ input: study.sim.input, pMax: strategy.pMaxRef })); } catch { /* idem */ }
+    }
+
+    const NOTE = {
+      warning: 'border-warning/40 bg-warning/5 text-warning',
+      danger: 'border-danger/40 bg-danger/5 text-danger',
+      accent: 'border-accent/40 bg-accent/5 text-accent',
+    } as const;
+    const note = (kind: keyof typeof NOTE, html: string) => `<div class="card ${NOTE[kind]} p-3 text-[12px] leading-relaxed">${html}</div>`;
+    const cell = (k: string, v: string, sub = '', tone = '') =>
+      `<div class="bg-surface p-3"><div class="text-[10px] uppercase tracking-wide text-subtle">${k}</div>
+        <div class="mt-0.5 font-mono text-[15px] font-medium tabular ${tone}">${v}</div>${sub ? `<div class="text-[10px] leading-snug text-subtle">${sub}</div>` : ''}</div>`;
+
+    function renderHeader() {
+      const m = study.ev.metrics, fl = study.flight, sim = study.sim;
+      $('s-payload-val').textContent = `${spec.payloadG.toFixed(0)} g · ${riceVolumeL(spec.payloadG).toFixed(2)} L`;
+      $('e-rho').textContent = spec.rho.toFixed(3);
+      ($('s-payload') as HTMLInputElement).max = String(Math.max(3000, Math.ceil(sweep.maxPayloadG / 500) * 500));
+
+      const pf = study.planform;
+      $('geo-line').textContent = `S ${f(study.model.S, 3)} m² · c raíz ${f(rootChordOf(pf) * 1000, 0)} mm · MAC ${f(macOf(pf) * 1000, 0)} mm · CLmáx ${f(study.model.clMaxWing, 2)}`;
+      drawPlanform(pf.spanM, rootChordOf(pf), pf.taper);
+
+      $('k-points').textContent = f(sim.points, 0);
+      $('k-points-sub').textContent = `de 750 · P_equipo ${f(sim.result.pEquipo, 2)} frente a P_max ${strategy.pMaxRef}`;
+      $('k-mass').textContent = `${f(m.mtowKg, 2)} kg`;
+      $('k-mass-sub').textContent = `vacío ${f(m.emptyKg, 2)} kg${spec.emptyMassG > 0 ? ' (pesado)' : ' (estimado)'} · ${f(m.wingLoadingGm2 / 100, 0)} g/dm²`;
+      const b = sweep.best;
+      $('k-best').textContent = b ? `${f(b.payloadG, 0)} g` : '—';
+      $('k-best-sub').textContent = b ? `${f(b.points, 0)} pts · marca de ${b.takeoffMarkM} m` : 'no despega en 60 m';
+      $('k-box').textContent = `${f(fl.box.sumMm, 0)} mm`;
+      $('k-box-sub').textContent = fl.box.sumMm <= XC27_LIMITS.boxSumMm
+        ? `caja mínima · ${fl.box.panels} paneles · sobran ${f(XC27_LIMITS.boxSumMm - fl.box.sumMm, 0)} mm`
+        : `excede el límite en ${f(fl.box.sumMm - XC27_LIMITS.boxSumMm, 0)} mm`;
+      $('k-box').className = `mt-1 font-mono text-lg font-semibold ${fl.box.sumMm <= XC27_LIMITS.boxSumMm ? '' : 'text-danger'}`;
+
+      const iLim = Math.min(study.drive.motor.iMax, study.drive.esc.iMax);
+      const n: string[] = [];
+      for (const r of study.ev.reasons) n.push(note('danger', r));
+      if (fl.takeoffMark === 'foul') n.push(note('danger', `La carrera de despegue simulada es de ${f(fl.takeoffRunM, 0)} m: con el margen ×${strategy.takeoffMargin} no cabe en los 60 m de pista. Baja la carga.`));
+      if (fl.batteryMarginPct < 0) n.push(note('danger', `La batería no aguanta la ronda: consume ${f(fl.missionMah, 0)} mAh y sólo hay ${f(fl.usableMah, 0)} mAh utilizables. No se puede cambiar en el pitstop (§8.6).`));
+      if (fl.box.sumMm > XC27_LIMITS.boxSumMm) n.push(note('danger', `El avión desmontado necesita una caja de ${f(fl.box.sumMm, 0)} mm de suma: por encima de los 1300 mm (§7.3). Reduce la cuerda, el fuselaje o la envergadura.`));
+      if (m.mtowKg > XC27_LIMITS.mtowMaxKg) n.push(note('danger', `MTOW de ${f(m.mtowKg, 1)} kg: por encima del límite legal de 25 kg.`));
+      if (fl.climb.throttle < 0.98) n.push(note('warning', `A tope la hélice pide más de ${iLim} A: el ascenso se hace al ${f(fl.climb.throttle * 100, 0)} % de gas para respetar el límite de motor y ESC.`));
+      if (spec.payloadG > 0 && spec.payloadG < XC27_LIMITS.minPayloadG) n.push(note('warning', `La bahía debe poder albergar al menos ${XC27_LIMITS.minPayloadG} g (§7.8).`));
+      if (fl.glide.capped) n.push(note('warning', 'El planeo llega al tope de 7 minutos (§9.5.2): a partir de ahí conviene planear más rápido.'));
+      if (sim.pointsRaw > 750.5) n.push(note('accent', `Este avión bate la referencia de la ronda (P_equipo ${f(sim.result.pEquipo, 2)} > P_max ${strategy.pMaxRef}). Sube P_max para ver diferencias entre diseños.`));
+      if (b && Math.abs(b.payloadG - spec.payloadG) > sweep.maxPayloadG / 40 * 1.5 && b.points > sim.pointsRaw + 5) {
+        n.push(note('accent', `Con ${f(b.payloadG, 0)} g de arroz este avión haría ${f(b.points, 0)} puntos en vez de ${f(sim.pointsRaw, 0)}: mira la pestaña «Carga de pago».`));
+      }
+      $('notes').innerHTML = n.join('');
+    }
+
+    function drawPlanform(span: number, rootChord: number, taper: number) {
+      const s = span / 2, cr = rootChord, ct = cr * taper;
+      const W = 300, H = 90, pad = 8;
+      const sc = Math.min((W - 2 * pad) / span, (H - 2 * pad) / cr);
+      const cx = W / 2;
+      const X = (y: number) => cx + y * sc, Y = (x: number) => pad + x * sc;
+      // línea de ¼ de cuerda recta
+      const off = 0.25 * (cr - ct);
+      const pts = [[X(0), Y(0)], [X(s), Y(off)], [X(s), Y(off + ct)], [X(0), Y(cr)], [X(-s), Y(off + ct)], [X(-s), Y(off)]];
+      $('planform').innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="w-full" role="img" aria-label="Forma en planta del ala">
+        <polygon points="${pts.map((p) => p.join(',')).join(' ')}" fill="rgb(${css('--accent')} / 0.18)" stroke="rgb(${css('--accent')})" stroke-width="1.4"/>
+        <line x1="${cx}" y1="2" x2="${cx}" y2="${H - 2}" stroke="rgb(${css('--border')})" stroke-dasharray="3 3"/></svg>`;
+    }
+
+    // ---------------- pestañas ----------------
+    function showTab(id: string) {
+      activeTab = id;
+      document.querySelectorAll<HTMLElement>('[data-panel]').forEach((p) => p.classList.toggle('hidden', p.dataset.panel !== id));
+      document.querySelectorAll<HTMLElement>('.tab-btn').forEach((b) => {
+        const on = b.dataset.tab === id;
+        b.classList.toggle('border-accent', on); b.classList.toggle('text-fg', on);
+        b.classList.toggle('border-transparent', !on); b.classList.toggle('text-muted', !on);
+        b.setAttribute('aria-selected', String(on));
+      });
+      if (location.hash.slice(1) !== id) history.replaceState(null, '', '#' + id);
+      renderTab();
+    }
+    function renderTab() {
+      if (activeTab === 'ronda') renderRound();
+      else if (activeTab === 'carga') renderPayload();
+      else if (activeTab === 'propulsion') renderThrust();
+      else if (activeTab === 'estructura') renderStructure();
+      else if (activeTab === 'estabilidad') renderStability();
+      else if (activeTab === 'caja') renderBox();
+    }
+
+    // ---------------- ronda ----------------
+    function renderRound() {
+      const m = study.ev.metrics, fl = study.flight, r = study.sim.result, i = study.sim.input;
+      const card = (title: string, tag: string, big: string, rows: [string, string][]) => `<div class="card p-4">
+        <div class="flex items-center justify-between"><span class="text-[11px] font-semibold uppercase tracking-wide text-subtle">${title}</span><span class="badge !py-0 !text-[10px]">${tag}</span></div>
+        <div class="mt-1 font-mono text-xl font-semibold tabular">${big}</div>
+        <dl class="mt-2 space-y-1 text-[11px]">${rows.map(([k, v]) => `<div class="flex justify-between gap-2"><dt class="text-muted">${k}</dt><dd class="font-mono">${v}</dd></div>`).join('')}</dl></div>`;
+      $('phase-cards').innerHTML =
+        card('Despegue', `B_desp ×${r.bDespegue}`, `${f(fl.takeoffRunM, 0)} m`, [
+          ['Marca declarable', fl.takeoffMark === 'foul' ? 'fuera de pista' : `${fl.takeoffMark} m`],
+          ['Empuje/peso estático', f(m.thrustWeight, 2)], ['V de pérdida', `${f(m.stallSpeedMs, 1)} m/s`],
+          ['Carga alar', `${f(m.wingLoadingGm2 / 100, 0)} g/dm²`],
+        ]) +
+        card('Ascenso 60 s', `P_AS ${f(r.pAS, 1)}`, `${f(fl.climb.alt60M, 0)} m`, [
+          ['Sin techo daría', `${f(fl.climb.rawAlt60M, 0)} m`], ['Régimen de ascenso', `${f(fl.climb.rocMs, 1)} m/s`],
+          ['V de ascenso', `${f(fl.climb.vClimb, 1)} m/s`], ['Corriente', `${f(fl.climb.currentA, 0)} A`],
+        ]) +
+        card('Planeo', `P_VE ${f(r.pVE, 2)}`, `${f(fl.glide.distM, 0)} m`, [
+          ['Desde / hasta', `${f(fl.climb.altCutM, 0)} → ${strategy.glideEndAltM} m`], ['Fineza con hélice ' + (study.drive.prop.folding ? 'plegada' : 'parada'), f(fl.glide.ld, 1)],
+          ['V de planeo', `${f(fl.glide.v, 1)} m/s`], ['Duración', `${f(fl.glide.timeS, 0)} s`],
+        ]) +
+        card('Pilones', `P_PI ${f(r.pPI, 2)}`, fl.pylons.timeS < 900 ? `${f(fl.pylons.timeS, 1)} s` : 'no vuela', [
+          ['Masa sin arroz', `${f(fl.emptyFlightKg, 2)} kg`], ['V media', `${f(fl.pylons.v, 1)} m/s`],
+          ['Viraje', `${f(fl.pylons.n, 1)} g · R ${f(fl.pylons.turnRadiusM, 0)} m`], ['Por viraje', `${f(fl.pylons.turnTimeS, 1)} s`],
+        ]);
+
+      const tone = (v: number) => (v > 1 ? 'text-success' : v < 1 ? 'text-danger' : '');
+      $('score-cells').innerHTML =
+        cell('P_AS', f(r.pAS, 1), `${f(i.alt60M, 0)} m a los 60 s`) +
+        cell('P_CA', f(r.pCA, 4), `${f(i.declaredKg, 2)} kg declarados`) +
+        cell('P_VE', f(r.pVE, 3), `${f(i.glideDistM, 0)} m de planeo`) +
+        cell('P_PI', f(r.pPI, 3), i.pylonTimeS > 0 ? `${f(i.pylonTimeS, 1)} s` : 'sin pilones') +
+        cell('B_predicción', '×' + r.bPrediccion, `${f(strategy.carryFraction * 100, 0)} % de lo declarado`, tone(r.bPrediccion)) +
+        cell('B_despegue', '×' + r.bDespegue, i.takeoff === 'foul' ? 'fuera de pista' : `${i.takeoff} m`, tone(r.bDespegue)) +
+        cell('B_carga', '×' + f(r.bCarga, 3), `T_CD estimado ${f(i.loadUnloadS, 0)} s`, tone(r.bCarga)) +
+        cell('S_piloto', '×' + r.sPiloto, strategy.externalPilot ? 'piloto externo' : 'piloto del equipo', tone(r.sPiloto));
+      const share = r.efficient + r.pPI > 0 ? (100 * r.efficient) / (r.efficient + r.pPI) : 0;
+      $('score-formula').innerHTML = `(${f(r.pAS, 1)} · ${f(r.pCA, 4)} · ${f(r.pVE, 3)} + ${f(r.pPI, 3)}) × ${f(r.multiplier, 3)} = <span class="text-fg">${f(r.pEquipo, 3)}</span>
+        &nbsp;→&nbsp; 750 · ${f(r.pEquipo, 3)} / ${strategy.pMaxRef} = <span class="text-fg">${f(study.sim.pointsRaw, 0)} pts</span>
+        <br/>${f(share, 0)} % de P_equipo viene de carga · ascenso · planeo y ${f(100 - share, 0)} % de los pilones.`;
+
+      const prof = roundProfile(study);
+      plot('c-profile', [{
+        x: prof.map((p) => p.t), y: prof.map((p) => p.h), mode: 'lines', line: { color: rgb('--accent'), width: 2 },
+        fill: 'tozeroy', fillcolor: rgba('--accent', 0.12), text: prof.map((p) => p.phase),
+        hovertemplate: '%{text}<br>t = %{x:.0f} s · h = %{y:.0f} m<extra></extra>', showlegend: false,
+      }], {
+        xaxis: { title: 'tiempo (s)' }, yaxis: { title: 'altitud (m)', range: [0, 130] },
+        shapes: [hline(XC27_LIMITS.altMaxM, rgb('--danger')), hline(XC27_LIMITS.altMinM, rgb('--warning'))],
+      });
+
+      const COL = ['bg-accent', 'bg-cyan', 'bg-warning', 'bg-danger', 'bg-subtle'];
+      const cap = study.drive.pack.capacityMah;
+      $('energy-bar').innerHTML = fl.energy.map((e, k) => `<div class="${COL[k % COL.length]}" style="width:${(100 * e.mah) / cap}%" title="${e.phase}"></div>`).join('');
+      $('energy-rows').innerHTML = fl.energy.map((e, k) => `<div class="flex items-center gap-2">
+          <span class="h-2 w-2 shrink-0 rounded-sm ${COL[k % COL.length]}"></span><span class="min-w-0 flex-1 truncate text-muted">${e.phase}</span>
+          <span class="shrink-0 font-mono text-[11px] text-subtle">${f(e.seconds, 0)} s · ${f(e.amps, 0)} A</span><span class="w-20 shrink-0 text-right font-mono">${f(e.mah, 0)} mAh</span></div>`).join('') +
+        `<div class="flex justify-between border-t border-border pt-2 font-medium"><span>Consumo de la ronda</span><span class="font-mono">${f(fl.missionMah, 0)} mAh</span></div>
+         <div class="flex justify-between text-muted"><span>Utilizable (${study.drive.pack.label}, reserva ${spec.reservePct} %)</span><span class="font-mono">${f(fl.usableMah, 0)} mAh</span></div>
+         <div class="flex justify-between ${fl.batteryMarginPct >= 0 ? 'text-success' : 'text-danger'}"><span>Margen</span><span class="font-mono">${f(fl.batteryMarginPct, 0)} %</span></div>
+         <p class="pt-1 text-[11px] leading-relaxed text-subtle">Cálculo de capacidad que pide el apartado «Circuito electrónico» del informe. Energía del pack: ${f(packWh(study.drive.pack), 0)} Wh; descarga máxima ${f(fl.climb.currentA / (cap / 1000), 0)}C de ${study.drive.pack.cRating}C.</p>`;
+
+      const ms = study.ev.masses;
+      const parts: [string, number, string][] = [
+        ['Ala', ms.wingG, 'bg-accent'], ['Fuselaje y cola', ms.fuseTailG, 'bg-cyan'], ['Batería', ms.batteryG, 'bg-success'],
+        ['Arroz', ms.payloadG, 'bg-warning'], ['Propulsión', ms.motorG + ms.propG + ms.escG, 'bg-danger'],
+        ['Radio', ms.avionicsG, 'bg-subtle'], ['Telemetría', ms.fixedG, 'bg-muted'], ['Tren y varios', ms.miscG, 'bg-border'],
+      ];
+      const tot = ms.mtowG || 1;
+      $('mass-bar').innerHTML = parts.map(([, g, c]) => `<div class="${c}" style="width:${(Math.max(0, g) / tot) * 100}%"></div>`).join('');
+      $('mass-legend').innerHTML = parts.map(([n, g, c]) =>
+        `<span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-sm ${c}"></span>${n} <span class="font-mono text-subtle">${g.toFixed(0)} g</span></span>`).join('') +
+        `<span class="ml-auto font-mono font-medium">OEW ${(ms.emptyG / 1000).toFixed(2)} kg · MTOW ${(tot / 1000).toFixed(2)} kg</span>`;
+    }
+
+    // ---------------- carga ----------------
+    function renderPayload() {
+      const pts = sweep.points;
+      const x = pts.map((p) => p.payloadG);
+      const k = 750 / strategy.pMaxRef;
+      plot('c-sweep', [
+        { x, y: pts.map((p) => (p.flies ? p.points : null)), name: 'puntos de ronda', mode: 'lines', line: { color: rgb('--accent'), width: 2.5 }, hovertemplate: '%{x:.0f} g → %{y:.0f} pts<extra></extra>' },
+        { x, y: pts.map((p) => (p.flies ? p.efficient * p.multiplier * k : null)), name: 'carga · ascenso · planeo', mode: 'lines', line: { color: rgb('--cyan'), width: 1.5, dash: 'dot' }, hovertemplate: '%{y:.0f} pts<extra></extra>' },
+        { x, y: pts.map((p) => (p.flies ? p.pPI * p.multiplier * k : null)), name: 'pilones', mode: 'lines', line: { color: rgb('--warning'), width: 1.5, dash: 'dot' }, hovertemplate: '%{y:.0f} pts<extra></extra>' },
+        { x, y: pts.map((p) => Math.min(p.takeoffRunM, 90)), name: 'carrera de despegue (m)', yaxis: 'y2', mode: 'lines', line: { color: rgb('--subtle'), width: 1.2 }, hovertemplate: '%{y:.0f} m<extra></extra>' },
+      ], {
+        xaxis: { title: 'arroz transportado (g)' }, yaxis: { title: 'puntos de ronda', rangemode: 'tozero' },
+        yaxis2: { title: 'carrera (m)', range: [0, 90] },
+        shapes: [vline(spec.payloadG, rgb('--success'), 'solid')],
+      });
+
+      const rows = [20, 40, 60].map((mark) => {
+        const best = pts.filter((p) => p.flies && p.takeoffMarkM === mark).sort((a, b) => b.pEquipo - a.pEquipo)[0];
+        return { mark, best };
+      });
+      const top = sweep.best;
+      $('mark-table').innerHTML = rows.map(({ mark, best }) => best
+        ? `<tr class="${top && best.payloadG === top.payloadG ? 'bg-surface2' : ''}">
+            <td class="px-4 py-2 font-sans">${mark} m <span class="text-[10px] text-subtle">×${mark === 20 ? 1.25 : mark === 40 ? 1.125 : 1}</span></td>
+            <td class="px-3 py-2 text-right">${f(best.payloadG, 0)} g</td><td class="px-3 py-2 text-right">${f(best.mtowKg, 2)} kg</td>
+            <td class="px-3 py-2 text-right">${f(best.takeoffRunM, 0)} m</td><td class="px-3 py-2 text-right">${f(best.alt60M, 0)} m</td>
+            <td class="px-3 py-2 text-right">${f(best.glideDistM, 0)} m</td><td class="px-3 py-2 text-right">${f(best.pEquipo, 2)}</td>
+            <td class="px-4 py-2 text-right font-medium">${f(best.points, 0)}</td></tr>`
+        : `<tr><td class="px-4 py-2 font-sans">${mark} m</td><td colspan="7" class="px-3 py-2 text-right font-sans text-subtle">ninguna carga despega en esta marca</td></tr>`).join('');
+
+      const mark = parseInt(val('p-mark'), 10) as 20 | 40 | 60;
+      const pred = payloadPrediction(study, mark, Math.max(0, num('p-alt')));
+      const fit = pred.points.map((p) => (pred.slope * p.rho + pred.intercept) / 1000);
+      plot('c-pred', [
+        { x: pred.points.map((p) => p.rho), y: pred.points.map((p) => p.payloadG / 1000), name: 'simulación', mode: 'markers', marker: { size: 7, color: rgb('--accent') }, hovertemplate: 'ρ %{x:.3f} → %{y:.2f} kg<extra></extra>' },
+        { x: pred.points.map((p) => p.rho), y: fit, name: 'recta de predicción', mode: 'lines', line: { color: rgb('--cyan'), width: 1.5 }, hoverinfo: 'skip' },
+      ], {
+        xaxis: { title: 'densidad del aire ρ (kg/m³)' }, yaxis: { title: 'carga transportable (kg)', rangemode: 'tozero' },
+        shapes: [vline(spec.rho, rgb('--success'))],
+      });
+      $('p-eq').textContent = pred.equation;
+      $('p-r2').textContent = pred.r2.toFixed(4);
+      $('p-today').textContent = `${f(pred.atDesignG / 1000, 2)} kg a ρ = ${spec.rho.toFixed(3)}`;
+      $('p-vol').textContent = `${f(riceVolumeL(Math.max(0, pred.atDesignG)), 2)} L`;
+    }
+
+    // ---------------- empuje ----------------
+    function renderThrust() {
+      const tm = thrustModel(study, 40);
+      const m = study.ev.metrics, fl = study.flight;
+      const S = study.model.S, rho = spec.rho;
+      const dragCurve = (massKg: number) => tm.v.map((V) => {
+        const W = massKg * G, q = 0.5 * rho * V * V * S;
+        const CL = q > 0 ? W / q : 99;
+        return CL <= study.model.clMaxWing ? q * study.model.cd(CL, V) : null;
+      });
+      const colors = [rgb('--accent'), rgb('--cyan'), rgb('--subtle')];
+      plot('c-thrust', [
+        ...tm.curves.map((c, k) => ({ x: tm.v, y: c.thrustN, name: `gas ${f(c.throttle * 100, 0)} %`, mode: 'lines', line: { color: colors[k], width: k === 0 ? 2.2 : 1.4 }, hovertemplate: '%{x} m/s → %{y:.1f} N<extra></extra>' })),
+        { x: tm.v, y: tm.sustainedN, name: `sostenible (≤ ${tm.iLimitA} A)`, mode: 'lines', line: { color: rgb('--success'), width: 1.4, dash: 'dash' }, hovertemplate: '%{y:.1f} N<extra></extra>' },
+        { x: tm.v, y: dragCurve(m.mtowKg), name: `requerido cargado (${f(m.mtowKg, 2)} kg)`, mode: 'lines', line: { color: rgb('--danger'), width: 1.6 }, hovertemplate: '%{y:.1f} N<extra></extra>' },
+        { x: tm.v, y: dragCurve(fl.emptyFlightKg), name: `requerido sin arroz (${f(fl.emptyFlightKg, 2)} kg)`, mode: 'lines', line: { color: rgb('--warning'), width: 1.6, dash: 'dot' }, hovertemplate: '%{y:.1f} N<extra></extra>' },
+      ], { xaxis: { title: 'velocidad (m/s)' }, yaxis: { title: 'empuje (N)', rangemode: 'tozero' } });
+
+      const p = study.drive.prop;
+      $('prop-kpis').innerHTML = [
+        ['Empuje estático', `${f(tm.staticThrustN, 1)} N`, `${f((tm.staticThrustN / G) * 1000, 0)} g a gas a tope`],
+        ['Corriente estática', `${f(tm.staticCurrentA, 0)} A`, `límite de motor y ESC: ${tm.iLimitA} A`],
+        ['Hélice', `${p.dia}×${p.pitch}"`, p.folding ? 'plegable: casi sin resistencia en el planeo' : 'fija: frena el planeo con el motor parado'],
+        ['V en pilones, sin arroz', `${f(fl.pylons.v, 1)} m/s`, 'media sostenida entre rectas y virajes'],
+      ].map(([k, v, s]) => `<div class="card p-4"><div class="text-[11px] font-semibold uppercase tracking-wide text-subtle">${k}</div><div class="mt-1 font-mono text-lg font-semibold">${v}</div><div class="text-[11px] text-subtle">${s}</div></div>`).join('');
+      $('t-eq').textContent = tm.equation;
+      $('t-note').innerHTML = `Ajuste por mínimos cuadrados sobre el mapa de propulsión (de medio gas a tope, hasta 40 m/s), R² = ${tm.r2.toFixed(3)}.
+        <strong class="text-fg">δ</strong> es la palanca (0…1) y <strong class="text-fg">V</strong> la velocidad de vuelo en m/s, a ρ = ${spec.rho.toFixed(3)} kg/m³ y con ${study.drive.pack.label}.
+        La forma δ² · δV · V² sale de T = ρ·n²·D⁴·C_T(J) con C_T lineal en J y n proporcional a la palanca. Hipótesis: régimen estacionario, tensión nominal de ${f(study.drive.pack.cells * study.drive.pack.vcell, 1)} V con caída por resistencia interna, coeficientes C_T(J) y C_P(J) de la hélice ajustados a datos de túnel.`;
+    }
+
+    // ---------------- estructura ----------------
+    function renderStructure() {
+      const m = study.ev.metrics, fl = study.flight;
+      const vn = vnDiagram(study.model, m.mtowKg, spec.rho, struct.nPos, struct.nNeg, Math.max(fl.pylons.v, m.maxSpeedMs * 0.9), struct.gust);
+      plot('c-vn', [
+        { x: vn.maneuver.map((p) => p.v), y: vn.maneuver.map((p) => p.n), name: 'maniobra', mode: 'lines', fill: 'toself', fillcolor: rgba('--accent', 0.10), line: { color: rgb('--accent'), width: 2 }, hovertemplate: '%{x:.1f} m/s · n = %{y:.2f}<extra></extra>' },
+        { x: vn.gustPos.map((p) => p.v), y: vn.gustPos.map((p) => p.n), name: `ráfaga ±${struct.gust} m/s`, mode: 'lines+markers', line: { color: rgb('--warning'), width: 1.4, dash: 'dash' }, hovertemplate: 'n = %{y:.2f}<extra></extra>' },
+        { x: vn.gustNeg.map((p) => p.v), y: vn.gustNeg.map((p) => p.n), mode: 'lines+markers', showlegend: false, line: { color: rgb('--warning'), width: 1.4, dash: 'dash' }, hovertemplate: 'n = %{y:.2f}<extra></extra>' },
+      ], { xaxis: { title: 'velocidad equivalente (m/s)' }, yaxis: { title: 'factor de carga n' }, shapes: [vline(vn.va, rgb('--subtle')), vline(vn.vc, rgb('--subtle'))] });
+      $('vn-cells').innerHTML =
+        cell('V_S · pérdida', `${f(vn.vs, 1)} m/s`, `a ${f(m.mtowKg, 2)} kg`) +
+        cell('V_A · maniobra', `${f(vn.va, 1)} m/s`, `V_S·√${struct.nPos}`) +
+        cell('V_C · V_D', `${f(vn.vc, 1)} · ${f(vn.vd, 1)} m/s`, 'crucero de pilones · picado 1.3·V_C') +
+        cell('n de cálculo', f(vn.nDesign, 2), vn.nGustMax > struct.nPos ? 'dimensiona la ráfaga' : 'dimensiona la maniobra', vn.nGustMax > struct.nPos ? 'text-warning' : '');
+
+      const wb = wingBending(study.planform, study.airfoil, study.ev.masses, vn.nDesign, struct.sf);
+      plot('c-bend', [{
+        x: wb.stations.map((s) => s.y), y: wb.stations.map((s) => s.moment), mode: 'lines', fill: 'tozeroy',
+        fillcolor: rgba('--cyan', 0.12), line: { color: rgb('--cyan'), width: 2 }, showlegend: false, hovertemplate: 'y = %{x:.2f} m → %{y:.1f} N·m<extra></extra>',
+      }], { xaxis: { title: 'posición en la semienvergadura (m)' }, yaxis: { title: 'momento flector (N·m)', rangemode: 'tozero' },
+        shapes: [hline(wb.rootMomentTest, rgb('--warning'))] });
+      $('bend-cells').innerHTML =
+        cell('Momento en la raíz a 1 g', `${f(wb.rootMomentFlight1g, 1)} N·m`, 'sustentación elíptica menos el peso del ala') +
+        cell(`Momento al límite (n = ${f(vn.nDesign, 1)})`, `${f(wb.rootMomentLimit, 1)} N·m`, `cortante en la raíz ${f(wb.rootShearLimit, 0)} N`) +
+        cell('Momento en el ensayo de puntas', `${f(wb.rootMomentTest, 1)} N·m`, `equivale a ${f(wb.testEquivalentG, 2)} g de vuelo`, wb.rootMomentTest > wb.rootMomentLimit ? 'text-warning' : '') +
+        cell('Momento de cálculo', `${f(wb.designMoment, 1)} N·m`, `× ${struct.sf} de seguridad · ${f(wb.capForceN, 0)} N por cordón`);
+      $('spar-table').innerHTML = wb.options.map((o) => `<tr>
+        <td class="px-4 py-2 font-sans">${o.material.name}</td><td class="px-3 py-2 text-right">${o.material.sigmaMPa}</td>
+        <td class="px-3 py-2 text-right">${f(o.capAreaMm2, 1)} mm²</td><td class="px-3 py-2 text-right">${f(o.capMassG, 0)} g</td>
+        <td class="px-4 py-2 text-right">${f(o.tipDeflectionMm, 0)} mm</td></tr>`).join('');
+      $('bend-note').innerHTML = `Larguero de dos cordones separados ${f(wb.sparHeightMm, 0)} mm en la raíz (80 % del espesor del ${study.airfoil.name}).
+        Alternativa: tubo de carbono de Ø ${f(wb.tubeOdMm, 1)} mm y pared de 1 mm.
+        ${wb.rootMomentTest > wb.rootMomentLimit
+          ? 'El ensayo prevuelo de levantar el avión por las puntas es más exigente que el vuelo al factor límite: es el caso que dimensiona el larguero.'
+          : 'El vuelo al factor límite es más exigente que el ensayo prevuelo de puntas, que queda cubierto.'}
+        La unión entre paneles debe transmitir este mismo momento. Son valores de anteproyecto: confirma con ensayo estático real y, si puedes, con elementos finitos.`;
+    }
+
+    // ---------------- estabilidad ----------------
+    const GEO_KEYS = ['fuseLengthM', 'fuseWidthM', 'wingLeM', 'tailArmLeM', 'hSpanM', 'hChordM', 'vHeightM', 'vRootM', 'vTipM'] as const;
+
+    function renderStability() {
+      const st = stabilityOf(study, layout);
+      const smTone = (v: number) => (v < 0 ? 'text-danger' : v < 5 || v > 20 ? 'text-warning' : 'text-success');
+      $('stab-cells').innerHTML =
+        cell('Margen estático cargado', `${f(st.smLoadedPct, 1)} %`, `CG al ${f(st.cgLoadedPct, 1)} % de la MAC`, smTone(st.smLoadedPct)) +
+        cell('Margen estático sin arroz', `${f(st.smEmptyPct, 1)} %`, `CG al ${f(st.cgEmptyPct, 1)} % de la MAC`, smTone(st.smEmptyPct)) +
+        cell('Punto neutro', `${f(st.npPctMac, 1)} % MAC`, `a ${f(st.xNpM * 1000, 0)} mm del morro`) +
+        cell('CG admisible', `${f(st.cgFwdLimitM * 1000, 0)}–${f(st.cgAftLimitM * 1000, 0)} mm`, 'para un margen del 20 % al 5 %') +
+        cell('Volumen de cola horizontal', f(st.vH, 2), `S_h ${f(st.sH * 1e4, 0)} cm² · AR ${f(st.arH, 1)}`, st.vH < 0.35 ? 'text-warning' : '') +
+        cell('Volumen de cola vertical', f(st.vV, 3), `S_v ${f(st.sV * 1e4, 0)} cm²`, st.vV < 0.025 ? 'text-warning' : '') +
+        cell('Cuerda media aerodinámica', `${f(st.macM * 1000, 0)} mm`, `su borde de ataque a ${f(st.xLeMacM * 1000, 0)} mm`) +
+        cell('El CG se mueve al descargar', `${f(Math.abs(st.cgShiftMm), 0)} mm`, st.cgShiftMm > 0 ? 'hacia atrás' : st.cgShiftMm < 0 ? 'hacia delante' : 'no se mueve');
+      const LV = { ok: 'accent', aviso: 'warning', mal: 'danger' } as const;
+      $('stab-notes').innerHTML = st.notes.filter((n) => n.level !== 'ok').map((n) => note(LV[n.level], n.text)).join('')
+        || note('accent', 'Centrado correcto con y sin carga: el avión es estable en las dos mitades de la ronda. Confírmalo con XFLR5 o AVL para el informe (§6.2).');
+
+      GEO_KEYS.forEach((k) => {
+        const el = document.querySelector<HTMLInputElement>(`[data-geo="${k}"]`);
+        if (el && document.activeElement !== el) el.value = (layout[k] as number).toFixed(3);
+      });
+      $('mass-table').innerHTML = layout.items.map((i) => `<tr>
+        <td class="px-4 py-1.5">${i.label}${i.payload ? ' <span class="badge !py-0 !text-[9px]">se descarga</span>' : ''}</td>
+        <td class="px-2 py-1.5 text-right font-mono tabular text-muted">${i.massG.toFixed(0)}</td>
+        <td class="px-4 py-1.5 text-right"><input data-item="${i.id}" type="number" step="0.005" value="${i.xM.toFixed(3)}" class="field !w-24 !py-1 text-right text-[12px]" /></td>
+      </tr>`).join('') + `<tr class="font-medium"><td class="px-4 py-2">Total cargado / sin arroz</td>
+        <td class="px-2 py-2 text-right font-mono tabular">${st.massLoadedG.toFixed(0)} / ${st.massEmptyG.toFixed(0)}</td>
+        <td class="px-4 py-2 text-right font-mono tabular">${f(st.cgLoadedM, 3)} / ${f(st.cgEmptyM, 3)}</td></tr>`;
+      $('mass-table').querySelectorAll<HTMLInputElement>('[data-item]').forEach((el) => el.addEventListener('change', () => {
+        ensureLayoutEdit();
+        layoutEdit!.x[el.dataset.item!] = parseFloat(el.value) || 0;
+        save(); layout = resolveLayout(); renderStability();
+      }));
+      drawSideView(st);
+    }
+
+    function ensureLayoutEdit() {
+      if (layoutEdit) return;
+      // al primer cambio manual se congela la disposición actual entera
+      layoutEdit = {
+        geo: Object.fromEntries(GEO_KEYS.map((k) => [k, layout[k] as number])),
+        x: Object.fromEntries(layout.items.map((i) => [i.id, i.xM])),
+      };
+    }
+
+    function drawSideView(st: ReturnType<typeof stabilityOf>) {
+      const Lf = layout.fuseLengthM, cr = rootChordOf(study.planform);
+      const xMax = Math.max(Lf, layout.wingLeM + layout.tailArmLeM + layout.hChordM) + 0.05;
+      const W = 760, H = 190, pad = 24;
+      const sc = (W - 2 * pad) / xMax;
+      const X = (x: number) => pad + x * sc;
+      const y0 = 96, fh = Math.max(10, layout.fuseWidthM * sc);
+      const col = (v: string) => `rgb(${css(v)})`;
+      const maxM = Math.max(...layout.items.map((i) => i.massG), 1);
+      const xTail = layout.wingLeM + layout.tailArmLeM;
+      const marker = (x: number, label: string, c: string, up: boolean) => {
+        const y = up ? y0 - fh / 2 - 26 : y0 + fh / 2 + 26;
+        return `<line x1="${X(x)}" y1="${y0 - fh / 2 - 18}" x2="${X(x)}" y2="${y0 + fh / 2 + 18}" stroke="${c}" stroke-width="1.5" stroke-dasharray="${up ? '0' : '4 3'}"/>
+          <text x="${X(x)}" y="${up ? y - 2 : y + 8}" text-anchor="middle" font-size="10" font-family="JetBrains Mono, monospace" fill="${c}">${label}</text>`;
+      };
+      $('side-view').innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="w-full" role="img" aria-label="Vista lateral con centro de gravedad y punto neutro">
+        <rect x="${X(st.cgFwdLimitM)}" y="${y0 - fh / 2 - 14}" width="${Math.max(0, (st.cgAftLimitM - st.cgFwdLimitM) * sc)}" height="${fh + 28}" fill="${col('--success')}" opacity="0.10"/>
+        <path d="M ${X(0)} ${y0} Q ${X(0.04)} ${y0 - fh / 2} ${X(0.12 * Lf)} ${y0 - fh / 2} L ${X(0.55 * Lf)} ${y0 - fh / 2} L ${X(Lf)} ${y0 - 3} L ${X(Lf)} ${y0 + 3} L ${X(0.55 * Lf)} ${y0 + fh / 2} L ${X(0.12 * Lf)} ${y0 + fh / 2} Q ${X(0.04)} ${y0 + fh / 2} ${X(0)} ${y0} Z"
+          fill="${col('--surface-2')}" stroke="${col('--border')}" stroke-width="1.2"/>
+        <rect x="${X(layout.wingLeM)}" y="${y0 - fh / 2 - 5}" width="${cr * sc}" height="5" rx="2.5" fill="${col('--accent')}"/>
+        <rect x="${X(xTail)}" y="${y0 - 4}" width="${layout.hChordM * sc}" height="3.5" rx="1.75" fill="${col('--accent')}" opacity="0.8"/>
+        <polygon points="${X(xTail + layout.hChordM - layout.vRootM)},${y0 - 5} ${X(xTail + layout.hChordM)},${y0 - 5} ${X(xTail + layout.hChordM)},${y0 - 5 - layout.vHeightM * sc} ${X(xTail + layout.hChordM - layout.vTipM)},${y0 - 5 - layout.vHeightM * sc}"
+          fill="${col('--accent')}" opacity="0.25" stroke="${col('--accent')}" stroke-width="1"/>
+        ${layout.items.filter((i) => i.massG > 0).map((i) => `<circle cx="${X(i.xM)}" cy="${y0}" r="${3 + 9 * Math.sqrt(i.massG / maxM)}" fill="${i.payload ? col('--warning') : col('--muted')}" opacity="${i.payload ? 0.55 : 0.35}"><title>${i.label}: ${i.massG.toFixed(0)} g a ${i.xM.toFixed(3)} m</title></circle>`).join('')}
+        ${marker(st.cgLoadedM, 'CG cargado', col('--success'), true)}
+        ${Math.abs(st.cgShiftMm) > 2 ? marker(st.cgEmptyM, 'CG sin arroz', col('--warning'), false) : ''}
+        ${marker(st.xNpM, 'PN', col('--danger'), Math.abs(st.xNpM - st.cgLoadedM) * sc < 60 ? false : true)}
+        <line x1="${X(0)}" y1="${H - 14}" x2="${X(xMax - 0.05)}" y2="${H - 14}" stroke="${col('--border')}"/>
+        ${Array.from({ length: Math.floor((xMax - 0.05) / 0.2) + 1 }, (_, k) => `<text x="${X(k * 0.2)}" y="${H - 3}" text-anchor="middle" font-size="9" font-family="JetBrains Mono, monospace" fill="${col('--subtle')}">${(k * 0.2).toFixed(1)}</text>`).join('')}
+      </svg>
+      <p class="px-1 pt-1 text-[11px] leading-relaxed text-subtle">Banda verde: posiciones del CG con margen estático entre el 5 % y el 20 %. Los círculos son las masas (área proporcional a la masa; en ámbar, el arroz). Escala en metros desde el morro.</p>`;
+    }
+
+    document.querySelectorAll<HTMLInputElement>('[data-geo]').forEach((el) => el.addEventListener('change', () => {
+      ensureLayoutEdit();
+      layoutEdit!.geo[el.dataset.geo as keyof Layout] = Math.max(0.01, parseFloat(el.value) || 0);
+      save(); layout = resolveLayout(); if (!boxEdit) box = suggestedBox(study, layout); renderStability();
+    }));
+    $('btn-auto-layout').addEventListener('click', () => { layoutEdit = null; save(); layout = resolveLayout(); renderStability(); });
+
+    // ---------------- caja, bahía y planos ----------------
+    const BOX_KEYS = ['lengthMm', 'widthMm', 'heightMm', 'wingPanels', 'fusePieces'] as const;
+    function renderBox() {
+      BOX_KEYS.forEach((k) => {
+        const el = document.querySelector<HTMLInputElement>(`[data-box="${k}"]`);
+        if (el && document.activeElement !== el) el.value = String(box[k]);
+      });
+      const bc = boxCheck(study, layout, box);
+      $('box-sum').innerHTML = `<span class="${bc.sumOk ? 'text-success' : 'text-danger'}">${bc.sumMm} mm</span> <span class="text-subtle">/ ${XC27_LIMITS.boxSumMm}</span>`;
+      const ok = '<span class="text-success">cabe</span>', ko = '<span class="text-danger">no cabe</span>';
+      $('box-parts').innerHTML = bc.parts.map((p) => `<div class="flex items-center gap-3 px-4 py-2">
+          <div class="min-w-0 flex-1">${p.qty} × ${p.label}</div>
+          <div class="shrink-0 font-mono text-[11px] text-muted">${p.dimsMm.map((d) => d.toFixed(0)).join(' × ')} mm</div>
+          <div class="w-16 shrink-0 text-right text-[11px]">${p.fits ? ok : ko}</div></div>`).join('') +
+        `<div class="flex items-center gap-3 px-4 py-2"><div class="min-w-0 flex-1">Todo a la vez en la sección</div>
+          <div class="shrink-0 font-mono text-[11px] text-muted">${bc.sectionLayout}</div><div class="w-16 shrink-0 text-right text-[11px]">${bc.sectionFits ? ok : ko}</div></div>`;
+      const mb = study.flight.box;
+      $('box-notes').innerHTML = (bc.notes.length ? bc.notes.map((n) => note('danger', n)).join('')
+        : note('accent', `El avión cabe y sobran ${bc.marginMm} mm de suma. Con ${box.wingPanels} paneles esta caja admite hasta ${f(bc.maxSpanM, 2)} m de envergadura.`)) +
+        `<p class="text-[11px] leading-relaxed text-subtle">Caja mínima estimada para este avión: ${f(mb.lengthMm, 0)} × ${f(mb.widthMm, 0)} × ${f(mb.heightMm, 0)} mm (${f(mb.sumMm, 0)} mm), con ${mb.panels} paneles de ala y el ${mb.layout}.
+          Pasarse hasta 1 cm en una dimensión cuesta 10 puntos; más de 1 cm, hasta 500 (§9.7). Es una comprobación de anteproyecto: el encaje real se decide en el CAD.</p>`;
+
+      const rb = riceBay(spec.payloadG, layout);
+      $('rice-cells').innerHTML =
+        cell('Volumen de bahía', `${f(rb.volumeL, 2)} L`, `para ${spec.payloadG.toFixed(0)} g con un 8 % de holgura`) +
+        cell('Longitud en el fuselaje', `${f(rb.lengthInFuseM * 1000, 0)} mm`, `${f(rb.fuseUsePct, 0)} % del largo`, rb.fitsInFuse ? '' : 'text-warning') +
+        cell('Mínimo reglamentario', `${f(rb.minVolumeL, 2)} L`, `${XC27_LIMITS.minPayloadG} g de arroz`);
+      $('rice-note').innerHTML = `${rb.fitsInFuse ? 'El arroz cabe en el fuselaje junto a la batería y la radio.' : '<span class="text-warning">El arroz ocuparía casi la mitad del fuselaje: ensánchalo o reparte la carga en depósitos.</span>'}
+        La carga va a granel y debe quedar asegurada y completamente encerrada: perder arroz en vuelo reduce la puntuación en proporción.
+        Con el caudal de ${strategy.loadRateGs} g/s de la estrategia, cargar y descargar lleva unos ${f(study.sim.input.loadUnloadS, 0)} s:
+        una boca ancha y una compuerta de vaciado por gravedad valen puntos, porque B_carga es máximo por debajo de 35 s.`;
+
+      const st = stabilityOf(study, layout), pf = study.planform, m = study.ev.metrics;
+      const cr = rootChordOf(pf) * 1000;
+      const tol = (mm: number) => `±${drawingToleranceMm(mm).toFixed(0)} mm`;
+      const rows: [string, string, string][] = [
+        ['Envergadura del ala', `${f(pf.spanM * 1000, 0)} mm`, tol(pf.spanM * 1000)],
+        ['Cuerda en la raíz', `${f(cr, 0)} mm`, tol(cr)],
+        ['Cuerda en la punta', `${f(cr * pf.taper, 0)} mm`, tol(cr * pf.taper)],
+        ['Longitud del avión', `${f(layout.fuseLengthM * 1000, 0)} mm`, tol(layout.fuseLengthM * 1000)],
+        ['BA ala → BA estabilizador', `${f(layout.tailArmLeM * 1000, 0)} mm`, tol(layout.tailArmLeM * 1000)],
+        ['Envergadura estab. horizontal', `${f(layout.hSpanM * 1000, 0)} mm`, tol(layout.hSpanM * 1000)],
+        ['Cuerda raíz estab. horizontal', `${f(layout.hChordM * 1000, 0)} mm`, tol(layout.hChordM * 1000)],
+        ['Altura estab. vertical', `${f(layout.vHeightM * 1000, 0)} mm`, tol(layout.vHeightM * 1000)],
+        ['Cuerda raíz / punta vertical', `${f(layout.vRootM * 1000, 0)} / ${f(layout.vTipM * 1000, 0)} mm`, ''],
+        ['Centro de gravedad', `${f(st.cgLoadedM * 1000, 0)} mm del morro`, `${f(st.cgLoadedPct, 0)} % MAC`],
+        ['Perfil del ala', study.airfoil.name, `${(study.airfoil.tc * 100).toFixed(1)} % de espesor`],
+        ['Cuerda media aerodinámica', `${f(st.macM * 1000, 0)} mm`, ''],
+        ['Alargamiento', f(pf.aspectRatio, 2), ''],
+        ['Superficie alar', `${f(study.model.S * 100, 1)} dm²`, ''],
+        ['Superficie de estabilizadores', `${f(st.sH * 100, 1)} + ${f(st.sV * 100, 1)} dm²`, 'horizontal + vertical'],
+        ['Volumen de carga', `${f(rb.volumeL, 2)} L`, ''],
+        ['OEW', `${f(m.emptyKg, 2)} kg`, spec.emptyMassG > 0 ? 'pesado' : 'estimado'],
+        ['MTOW', `${f(m.mtowKg, 2)} kg`, ''],
+      ];
+      $('drawing-table').innerHTML = rows.map(([k, v, s]) => `<div class="flex items-baseline justify-between gap-3 bg-surface px-4 py-2 text-[12px]">
+        <span class="text-muted">${k}</span><span class="text-right font-mono">${v}${s ? ` <span class="text-[10px] text-subtle">${s}</span>` : ''}</span></div>`).join('');
+      ($('btn-copy-table') as HTMLButtonElement).onclick = () => {
+        navigator.clipboard?.writeText(rows.map(([k, v, s]) => `${k}\t${v}${s ? '\t' + s : ''}`).join('\n'));
+        $('btn-copy-table').textContent = 'Copiado'; setTimeout(() => { $('btn-copy-table').textContent = 'Copiar'; }, 1200);
+      };
+    }
+
+    document.querySelectorAll<HTMLInputElement>('[data-box]').forEach((el) => el.addEventListener('change', () => {
+      boxEdit = { ...box, [el.dataset.box!]: Math.max(1, Math.round(parseFloat(el.value) || 0)) };
+      box = boxEdit; save(); renderBox();
+    }));
+    $('btn-min-box').addEventListener('click', () => { boxEdit = null; box = suggestedBox(study, layout); save(); renderBox(); });
+
+    // ---------------- acciones ----------------
+    let timer = 0;
+    const onInput = () => {
+      clearTimeout(timer);
+      timer = window.setTimeout(() => { readInputs(); save(); compute(); }, 90);
+    };
+    document.querySelectorAll<HTMLElement>('aside input, aside select, #v-npos, #v-nneg, #v-gust, #v-sf').forEach((el) => el.addEventListener('input', onInput));
+    ['p-mark', 'p-alt'].forEach((id) => $(id).addEventListener('input', () => renderPayload()));
+    document.querySelectorAll<HTMLElement>('.tab-btn').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab!)));
+
+    $('btn-use-best').addEventListener('click', () => {
+      if (!sweep.best) return;
+      setVal('s-payload', Math.round(sweep.best.payloadG / 25) * 25);
+      readInputs(); save(); compute();
+    });
+    $('btn-reset').addEventListener('click', () => {
+      spec = { ...XC27_DEFAULT_SPEC }; strategy = { ...XC27_DEFAULT_STRATEGY }; env = { ...DEFAULT_ENV };
+      struct = { nPos: 3.8, nNeg: -1.5, gust: 5, sf: 1.5 }; layoutEdit = null; boxEdit = null;
+      writeInputs(); readInputs(); save(); compute();
+    });
+    $('btn-to-calc').addEventListener('click', () => { location.href = '/xc27#ronda'; });
+    $('btn-json').addEventListener('click', () => {
+      const m = study.ev.metrics;
+      const data = JSON.stringify({
+        schema: 'uav-suite/xc27-aircraft@1', spec, strategy, environment: env,
+        airfoil: study.airfoil.name, planform: study.planform,
+        powertrain: { motor: study.drive.motor.name, prop: study.drive.prop.name, pack: study.drive.pack.label, esc: study.drive.esc.name },
+        masses: study.ev.masses, metrics: m, flight: study.flight, score: study.sim,
+        bestPayload: sweep.best, layout, stability: stabilityOf(study, layout), box: boxCheck(study, layout, box),
+        thrustModel: (({ c, r2, equation, staticThrustN, staticCurrentA }) => ({ c, r2, equation, staticThrustN, staticCurrentA }))(thrustModel(study)),
+      }, null, 2);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+      a.download = 'xc27-avion.json'; a.click(); URL.revokeObjectURL(a.href);
+    });
+    window.addEventListener('themechange', () => { renderHeader(); renderTab(); });
+
+    // ---------------- arranque ----------------
+    writeInputs(); readInputs();
+    const initial = location.hash.slice(1);
+    activeTab = document.querySelector(`[data-panel="${initial}"]`) ? initial : 'ronda';
+    compute();
+    showTab(activeTab);
+  </script>
+</AppShell>

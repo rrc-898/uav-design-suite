@@ -1,0 +1,514 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+---
+<AppShell title="Propulsion Designer" subtitle="Tren propulsivo eléctrico · barrido de velocidad y de gas · catálogo XtraCalc">
+  <script is:inline src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight">Propulsion Designer</h1>
+      <p class="text-[13px] text-muted">Hélices con Ct(J)/Cp(J) reales (UIUC). Todo es función de la velocidad. Recalcula en tiempo real.</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <button id="btn-xc" class="btn">Config XC26</button>
+      <button id="btn-xc27" class="btn">Config XC27</button>
+      <button id="btn-csv" class="btn">Exportar CSV</button>
+      <button id="btn-json" class="btn">Exportar JSON</button>
+    </div>
+  </div>
+
+  <div class="grid gap-5 xl:grid-cols-[340px_1fr]">
+    <!-- ============ INPUTS ============ -->
+    <aside class="space-y-4 xl:sticky xl:top-20 xl:self-start xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto xl:pr-1">
+      <div class="card p-4">
+        <div class="mb-3 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Motor</div>
+        <select id="sel-motor" class="field mb-3"></select>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div><label class="field-label">KV (rpm/V)</label><input id="kv" type="number" class="field" /></div>
+          <div><label class="field-label">Rm (Ω)</label><input id="rm" type="number" step="0.001" class="field" /></div>
+          <div><label class="field-label">I₀ ref (A)</label><input id="i0ref" type="number" step="0.1" class="field" /></div>
+          <div><label class="field-label">V ref (V)</label><input id="vref" type="number" step="0.1" class="field" /></div>
+          <div class="col-span-2"><label class="field-label">I máx motor (A)</label><input id="imaxm" type="number" class="field" /></div>
+        </div>
+      </div>
+
+      <div class="card p-4">
+        <div class="mb-3 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Hélice</div>
+        <select id="sel-prop" class="field mb-3"></select>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div><label class="field-label">Ø (in)</label><input id="dia" type="number" step="0.5" class="field" /></div>
+          <div><label class="field-label">Paso (in)</label><input id="pitch" type="number" step="0.5" class="field" /></div>
+        </div>
+        <p id="prop-note" class="mt-2 text-[10px] text-subtle">Ct/Cp polinómicos del catálogo.</p>
+      </div>
+
+      <div class="card p-4">
+        <div class="mb-3 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> Batería</div>
+        <select id="sel-batt" class="field mb-3"></select>
+        <div class="grid grid-cols-3 gap-2.5">
+          <div><label class="field-label">S</label><input id="cells" type="number" class="field" /></div>
+          <div><label class="field-label">V/celda</label><input id="vcell" type="number" step="0.1" class="field" /></div>
+          <div><label class="field-label">Rint/cel</label><input id="rint" type="number" step="0.001" class="field" /></div>
+          <div><label class="field-label">Cap mAh</label><input id="cap" type="number" class="field" /></div>
+          <div><label class="field-label">C</label><input id="crate" type="number" class="field" /></div>
+          <div><label class="field-label">Reserva %</label><input id="reserve" type="number" value="20" class="field" /></div>
+        </div>
+      </div>
+
+      <div class="card p-4">
+        <div class="mb-3 flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">●</span> ESC y entorno</div>
+        <select id="sel-esc" class="field mb-3"></select>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div><label class="field-label">ESC I máx (A)</label><input id="escimax" type="number" class="field" /></div>
+          <div><label class="field-label">ESC η</label><input id="esceff" type="number" step="0.01" class="field" /></div>
+          <div><label class="field-label">Altitud (m)</label><input id="altitude" type="number" value="0" class="field" /></div>
+          <div><label class="field-label">V crucero (m/s)</label><input id="cruisev" type="number" value="18" class="field" /></div>
+          <div class="col-span-2"><label class="field-label">Empuje requerido / objetivo (g)</label><input id="weight" type="number" value="1500" class="field" /></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ============ RESULTS ============ -->
+    <section class="space-y-5">
+      <div id="warnings" class="space-y-2"></div>
+
+      <div class="grid gap-3 md:grid-cols-4">
+        <div class="card p-4">
+          <div class="mb-2 flex items-center justify-between"><span class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Full throttle estático</span><span class="badge">100%</span></div>
+          <div class="font-mono text-2xl font-semibold tabular" id="o-thrust">—</div>
+          <div class="text-[11px] text-subtle">empuje estático</div>
+          <dl class="mt-3 space-y-1.5 text-[12px]">
+            <div class="flex justify-between"><dt class="text-muted">Corriente</dt><dd class="font-mono tabular" id="o-current">—</dd></div>
+            <div class="flex justify-between"><dt class="text-muted">RPM</dt><dd class="font-mono tabular" id="o-rpm">—</dd></div>
+            <div class="flex justify-between"><dt class="text-muted">Pot. in</dt><dd class="font-mono tabular" id="o-power">—</dd></div>
+            <div class="flex justify-between"><dt class="text-muted">Efic.</dt><dd class="font-mono tabular" id="o-gw">—</dd></div>
+          </dl>
+        </div>
+        <div class="card p-4">
+          <div class="mb-2 flex items-center justify-between"><span class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Crucero</span><span class="badge" id="c-throttle">—</span></div>
+          <div class="font-mono text-2xl font-semibold tabular" id="c-endur">—</div>
+          <div class="text-[11px] text-subtle">min · <span id="c-range">—</span> km</div>
+          <dl class="mt-3 space-y-1.5 text-[12px]">
+            <div class="flex justify-between"><dt class="text-muted">Empuje</dt><dd class="font-mono tabular" id="c-thrust">—</dd></div>
+            <div class="flex justify-between"><dt class="text-muted">Corriente</dt><dd class="font-mono tabular" id="c-current">—</dd></div>
+            <div class="flex justify-between"><dt class="text-muted">η hélice</dt><dd class="font-mono tabular" id="c-etaprop">—</dd></div>
+            <div class="flex justify-between"><dt class="text-muted">η total</dt><dd class="font-mono tabular" id="c-eta">—</dd></div>
+          </dl>
+        </div>
+        <div class="card p-4">
+          <div class="mb-2 flex items-center justify-between"><span class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Empuje objetivo</span><span class="badge" id="h-weight">—</span></div>
+          <div class="font-mono text-2xl font-semibold tabular" id="h-throttle">—</div>
+          <div class="text-[11px] text-subtle">gas necesario (estático)</div>
+          <dl class="mt-3 space-y-1.5 text-[12px]">
+            <div class="flex justify-between"><dt class="text-muted">Corriente</dt><dd class="font-mono tabular" id="h-current">—</dd></div>
+            <div class="flex justify-between"><dt class="text-muted">Autonomía</dt><dd class="font-mono tabular" id="h-endur">—</dd></div>
+            <div class="flex justify-between"><dt class="text-muted">T/W</dt><dd class="font-mono tabular" id="h-tw">—</dd></div>
+            <div class="flex justify-between"><dt class="text-muted">C-rate</dt><dd class="font-mono tabular" id="h-crate">—</dd></div>
+          </dl>
+        </div>
+        <div class="card p-4 ring-1 ring-accent/30">
+          <div class="mb-2 flex items-center justify-between"><span class="text-[11px] font-semibold uppercase tracking-wide text-subtle">Mejor alcance</span><span class="badge">100%</span></div>
+          <div class="font-mono text-2xl font-semibold tabular" id="r-range">—</div>
+          <div class="text-[11px] text-subtle">km máx · a <span id="r-speed">—</span> m/s</div>
+          <dl class="mt-3 space-y-1.5 text-[12px]">
+            <div class="flex justify-between"><dt class="text-muted">V crucero</dt><dd class="font-mono tabular" id="r-vc">—</dd></div>
+            <div class="flex justify-between"><dt class="text-muted">η máx hélice</dt><dd class="font-mono tabular" id="r-etamax">—</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <!-- ===== Velocity sweep (XtraCalc style) ===== -->
+      <div class="card p-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div class="text-[13px] font-semibold">Barrido de velocidad</div>
+            <div class="text-[11px] text-subtle">Todas las magnitudes en función de la velocidad de avance, a gas fijo.</div>
+          </div>
+          <label class="flex items-center gap-3 text-[12px]">
+            <span class="text-muted">Gas</span>
+            <input id="vthr" type="range" min="20" max="100" value="100" step="5" class="w-40 accent-accent" />
+            <span class="kbd w-10 text-center" id="vthr-val">100%</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="grid gap-3 lg:grid-cols-2">
+        <div class="card p-3"><div class="mb-1 px-1 text-[12px] font-semibold">Empuje vs Velocidad</div><div id="v-thrust" class="h-64"></div></div>
+        <div class="card p-3"><div class="mb-1 px-1 text-[12px] font-semibold">Potencia vs Velocidad</div><div id="v-power" class="h-64"></div></div>
+        <div class="card p-3"><div class="mb-1 px-1 text-[12px] font-semibold">Corriente vs Velocidad <span class="text-subtle font-normal">(límites motor/ESC)</span></div><div id="v-current" class="h-64"></div></div>
+        <div class="card p-3"><div class="mb-1 px-1 text-[12px] font-semibold">Autonomía y alcance vs Velocidad</div><div id="v-endur" class="h-64"></div></div>
+        <div class="card p-3"><div class="mb-1 px-1 text-[12px] font-semibold">Eficiencia y RPM vs Velocidad</div><div id="v-eff" class="h-64"></div></div>
+        <div class="card p-3"><div class="mb-1 px-1 text-[12px] font-semibold">Empuje vs Gas <span class="text-subtle font-normal">(estático)</span></div><div id="g-thrust" class="h-64"></div></div>
+      </div>
+
+      <!-- ===== Equation modeler → Aerodynamics ===== -->
+      <div class="card p-4 ring-1 ring-accent/20">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2 text-[13px] font-semibold"><span class="text-accent">∫</span> Modelar ecuación → Aerodinámica</div>
+            <div class="text-[11px] text-subtle">Ajusta un polinomio a una curva de propulsión (al gas seleccionado arriba) y expórtalo como ecuación f(V) para CFD Studio.</div>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <select id="fit-curve" class="field !w-auto !py-1.5 text-[12px]">
+              <option value="thrustN">Empuje T(V) [N]</option>
+              <option value="powerShaft">Potencia eje P(V) [W]</option>
+              <option value="powerElec">Potencia eléctrica P(V) [W]</option>
+              <option value="current">Corriente I(V) [A]</option>
+              <option value="etaTotal">η total (V) [%]</option>
+            </select>
+            <label class="flex items-center gap-2 text-[12px] text-muted">Orden
+              <input id="fit-order" type="range" min="1" max="6" value="3" step="1" class="w-28 accent-accent" />
+              <span class="kbd w-6 text-center" id="fit-order-val">3</span>
+            </label>
+            <button id="btn-fit-json" class="btn btn-primary !py-1.5">Exportar ecuación</button>
+            <button id="btn-fit-copy" class="btn !py-1.5">Copiar</button>
+          </div>
+        </div>
+
+        <div class="mt-3 grid gap-3 lg:grid-cols-[1fr_300px]">
+          <div id="chart-fit" class="h-72"></div>
+          <div class="space-y-3">
+            <div class="rounded-lg border border-border bg-surface2 p-3">
+              <div class="text-[10px] uppercase tracking-wide text-subtle">Ecuación ajustada</div>
+              <div id="fit-eq" class="mt-1 break-words font-mono text-[12px] leading-relaxed text-fg">—</div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div class="rounded-lg border border-border bg-surface2 p-3"><div class="text-[10px] uppercase tracking-wide text-subtle">R²</div><div id="fit-r2" class="mt-0.5 font-mono text-lg tabular">—</div></div>
+              <div class="rounded-lg border border-border bg-surface2 p-3"><div class="text-[10px] uppercase tracking-wide text-subtle">RMSE</div><div id="fit-rmse" class="mt-0.5 font-mono text-lg tabular">—</div></div>
+            </div>
+            <div class="rounded-lg border border-border bg-surface2 p-3">
+              <div class="text-[10px] uppercase tracking-wide text-subtle">Coeficientes a₀ … aₙ (ascendente)</div>
+              <div id="fit-coeffs" class="mt-1 break-words font-mono text-[11px] leading-relaxed text-muted">—</div>
+            </div>
+          </div>
+        </div>
+        <p class="mt-2 text-[10px] text-subtle">Formato de exportación: f(V) = Σ aᵢ·Vⁱ (ascendente, V en m/s). CFD Studio podrá leerlo para cruzar empuje disponible con la resistencia aerodinámica.</p>
+      </div>
+
+      <p class="text-[11px] leading-relaxed text-subtle">
+        Catálogo importado de <b>XtraCalc (XtraChallenge v2026.03)</b>: motores con Rm/I₀/inercia reales, 58 hélices con
+        Ct(J)/Cp(J) ajustados de la base UIUC y 55 baterías con resistencia interna medida. Modelo estacionario 0-D:
+        motor Kv acoplado a hélice por sus coeficientes, con caída de tensión de batería. Punto de operación por iteración.
+      </p>
+    </section>
+  </div>
+
+  <script>
+    import { MOTORS, PROPS, BATTERIES, ESCS } from '../lib/catalog';
+    import {
+      solvePoint, throttleSweep, velocitySweep, missionPoint,
+      throttleForThrust, maxStaticThrust, bestRangeSpeed, airDensity, type DriveTrain,
+    } from '../lib/propulsion';
+    import { polyfit, polyval, formatPoly } from '../lib/fit';
+
+    const $ = (id: string) => document.getElementById(id)!;
+    const num = (id: string) => parseFloat(($(id) as HTMLInputElement).value) || 0;
+
+    // grouped <select> by brand
+    function fillGrouped(sel: string, items: any[], label: (x: any) => string) {
+      const groups: Record<string, string> = {};
+      for (const it of items) {
+        const b = it.brand || 'Otros';
+        groups[b] = (groups[b] || '') + `<option value="${it.id}">${label(it)}</option>`;
+      }
+      ($(sel) as HTMLSelectElement).innerHTML = Object.entries(groups)
+        .map(([g, opts]) => `<optgroup label="${g}">${opts}</optgroup>`).join('');
+    }
+    fillGrouped('sel-motor', MOTORS, (m) => `${m.name}`);
+    fillGrouped('sel-prop', PROPS, (p) => `${p.dia}×${p.pitch}${p.folding ? ' (folding)' : ''}`);
+    fillGrouped('sel-batt', BATTERIES, (b) => `${b.series || ''} ${b.cells}S ${b.capacityMah}mAh ${b.cRating ? b.cRating + 'C' : ''}`.trim());
+    fillGrouped('sel-esc', ESCS, (e) => `${e.name}`);
+
+    let curProp = { ct: PROPS[0].ct, cp: PROPS[0].cp };
+
+    function loadMotor(id: string) {
+      const m = MOTORS.find((x) => x.id === id)!;
+      ($('kv') as HTMLInputElement).value = String(m.kv);
+      ($('rm') as HTMLInputElement).value = String(m.rm);
+      ($('i0ref') as HTMLInputElement).value = String(m.i0Ref);
+      ($('vref') as HTMLInputElement).value = String(m.vRef);
+      ($('imaxm') as HTMLInputElement).value = String(m.iMax);
+    }
+    function loadProp(id: string) {
+      const p = PROPS.find((x) => x.id === id)!;
+      ($('dia') as HTMLInputElement).value = String(p.dia);
+      ($('pitch') as HTMLInputElement).value = String(p.pitch);
+      curProp = { ct: p.ct, cp: p.cp };
+      $('prop-note').textContent = `${p.brand} ${p.family} · Ct[${p.ct.length}] Cp[${p.cp.length}] · ${p.name}`;
+    }
+    function loadBatt(id: string) {
+      const b = BATTERIES.find((x) => x.id === id)!;
+      ($('cells') as HTMLInputElement).value = String(b.cells);
+      ($('vcell') as HTMLInputElement).value = String(b.vcell);
+      ($('rint') as HTMLInputElement).value = String(b.rintCell);
+      ($('cap') as HTMLInputElement).value = String(b.capacityMah);
+      ($('crate') as HTMLInputElement).value = String(b.cRating);
+    }
+    function loadEsc(id: string) {
+      const e = ESCS.find((x) => x.id === id)!;
+      ($('escimax') as HTMLInputElement).value = String(e.iMax);
+      ($('esceff') as HTMLInputElement).value = String(e.efficiency);
+    }
+
+    function readDriveTrain(): DriveTrain {
+      return {
+        motor: { kv: num('kv'), rm: num('rm'), i0Ref: num('i0ref'), vRef: num('vref') || 10, iMax: num('imaxm') },
+        prop: { dia: num('dia'), pitch: num('pitch'), ct: curProp.ct, cp: curProp.cp },
+        battery: { cells: num('cells'), vcell: num('vcell'), capacityMah: num('cap'), cRating: num('crate'), rintCell: num('rint') },
+        esc: { iMax: num('escimax'), efficiency: num('esceff') || 0.97, resistance: 0.01 },
+        rho: airDensity(num('altitude')),
+        wireResistance: 0.005,
+      };
+    }
+
+    // ---- Plotly theming ----
+    const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+    const rgb = (v: string) => `rgb(${css(v)})`;
+    function L(extra: any = {}) {
+      const grid = `rgba(${css('--border')}, 0.6)`;
+      return {
+        paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+        font: { family: 'JetBrains Mono, monospace', size: 10, color: rgb('--muted') },
+        margin: { l: 48, r: 48, t: 8, b: 34 },
+        showlegend: true, legend: { orientation: 'h', y: 1.18, x: 0, font: { size: 9 } },
+        xaxis: { gridcolor: grid, zeroline: false, linecolor: grid, ...(extra.xaxis || {}) },
+        yaxis: { gridcolor: grid, zeroline: false, linecolor: grid, ...(extra.yaxis || {}) },
+        ...(extra.yaxis2 ? { yaxis2: extra.yaxis2 } : {}),
+      };
+    }
+    const CFG = { displayModeBar: true, responsive: true, displaylogo: false,
+      modeBarButtonsToRemove: ['lasso2d', 'select2d', 'autoScale2d'] } as any;
+
+    let lastConfig: any = null;
+    let lastFit: any = null;
+
+    function compute() {
+      const dt = readDriveTrain();
+      const reserve = num('reserve') / 100;
+      const Vc = num('cruisev');
+      const targetG = num('weight');
+      const vThr = num('vthr') / 100;
+      ($('vthr-val')).textContent = (vThr * 100).toFixed(0) + '%';
+      const limit = Math.min(dt.motor.iMax, dt.esc.iMax);
+      const vMax = Math.max(30, Vc * 1.8);
+
+      const stat = maxStaticThrust(dt);
+      const cThrottle = throttleForThrust(dt, targetG, Vc);
+      const cruise = missionPoint(dt, cThrottle, Vc, reserve);
+      const hThrottle = throttleForThrust(dt, targetG, 0);
+      const hover = missionPoint(dt, hThrottle, 0.01, reserve);
+      const br = bestRangeSpeed(dt, vMax, reserve);
+      const brPt = missionPoint(dt, 1, br.speed, reserve);
+
+      // cards
+      $('o-thrust').textContent = stat.thrustG.toFixed(0) + ' g';
+      $('o-current').textContent = stat.current.toFixed(1) + ' A';
+      $('o-rpm').textContent = stat.rpm.toFixed(0);
+      $('o-power').textContent = stat.powerElec.toFixed(0) + ' W';
+      $('o-gw').textContent = stat.gPerW.toFixed(2) + ' g/W';
+
+      $('c-throttle').textContent = (cThrottle * 100).toFixed(0) + '%';
+      $('c-endur').textContent = cruise.enduranceMin.toFixed(1);
+      $('c-range').textContent = cruise.rangeKm.toFixed(1);
+      $('c-thrust').textContent = cruise.thrustG.toFixed(0) + ' g';
+      $('c-current').textContent = cruise.current.toFixed(1) + ' A';
+      $('c-etaprop').textContent = (cruise.etaProp * 100).toFixed(0) + ' %';
+      $('c-eta').textContent = (cruise.etaTotal * 100).toFixed(0) + ' %';
+
+      $('h-weight').textContent = targetG.toFixed(0) + ' g';
+      $('h-throttle').textContent = (hThrottle * 100).toFixed(0) + '%';
+      $('h-current').textContent = hover.current.toFixed(1) + ' A';
+      $('h-endur').textContent = hover.enduranceMin.toFixed(1) + ' min';
+      $('h-tw').textContent = (stat.thrustG / targetG).toFixed(2);
+      $('h-crate').textContent = hover.cRateUsed.toFixed(0) + 'C';
+
+      $('r-range').textContent = br.rangeKm.toFixed(1) + ' km';
+      $('r-speed').textContent = br.speed.toFixed(0);
+      $('r-vc').textContent = Vc.toFixed(0) + ' m/s';
+      $('r-etamax').textContent = (brPt.etaProp * 100).toFixed(0) + ' %';
+
+      // warnings
+      const w: string[] = [];
+      if (stat.overCurrent) w.push(`<b>Sobrecorriente:</b> a full throttle se alcanzan ${stat.current.toFixed(0)} A > límite ${limit.toFixed(0)} A (motor/ESC). Reduce paso/diámetro o celdas, o limita el gas.`);
+      const cMax = dt.battery.cRating * dt.battery.capacityMah / 1000;
+      if (dt.battery.cRating > 0 && stat.current > cMax) w.push(`<b>Batería al límite:</b> ${stat.current.toFixed(0)} A > descarga continua ${cMax.toFixed(0)} A (${dt.battery.cRating}C).`);
+      if (dt.battery.cells > 4 || dt.battery.cells * dt.battery.vcell > 16.8) w.push(`<b>Fuera de reglamento XC26:</b> batería > 4S / 16.8 V.`);
+      renderWarnings(w);
+
+      // ---- velocity sweep ----
+      const vs = velocitySweep(dt, vThr, vMax, reserve, 40);
+      const gs = throttleSweep(dt, 0);
+      const A = rgb('--accent'), C = rgb('--cyan'), W2 = rgb('--warning'), G = rgb('--success'), D = rgb('--danger');
+      const grid = `rgba(${css('--border')},0.6)`;
+
+      Plotly.react('v-thrust', [
+        { x: vs.x, y: vs.thrust, name: 'Empuje', line: { color: A, width: 2.4 }, hovertemplate: '%{x:.0f} m/s → %{y:.0f} g<extra></extra>' },
+      ], L({ xaxis: { title: 'V (m/s)' }, yaxis: { title: 'g' } }), CFG);
+
+      Plotly.react('v-power', [
+        { x: vs.x, y: vs.powerElec, name: 'P eléctrica', line: { color: W2, width: 2.2 } },
+        { x: vs.x, y: vs.powerShaft, name: 'P eje (aero)', line: { color: C, width: 2, dash: 'dot' } },
+      ], L({ xaxis: { title: 'V (m/s)' }, yaxis: { title: 'W' } }), CFG);
+
+      Plotly.react('v-current', [
+        { x: vs.x, y: vs.current, name: 'Corriente', line: { color: C, width: 2.4 } },
+        { x: [0, vMax], y: [limit, limit], name: 'Límite', line: { color: D, width: 1.3, dash: 'dash' }, hoverinfo: 'skip' },
+      ], L({ xaxis: { title: 'V (m/s)' }, yaxis: { title: 'A' } }), CFG);
+
+      Plotly.react('v-endur', [
+        { x: vs.x, y: vs.endurance, name: 'Autonomía (min)', line: { color: G, width: 2.2 }, yaxis: 'y' },
+        { x: vs.x, y: vs.range, name: 'Alcance (km)', line: { color: A, width: 2.2 }, yaxis: 'y2' },
+      ], L({ xaxis: { title: 'V (m/s)' }, yaxis: { title: 'min' },
+        yaxis2: { title: 'km', overlaying: 'y', side: 'right', gridcolor: 'rgba(0,0,0,0)' } }), CFG);
+
+      Plotly.react('v-eff', [
+        { x: vs.x, y: vs.etaProp, name: 'η hélice (%)', line: { color: C, width: 2.2 }, yaxis: 'y' },
+        { x: vs.x, y: vs.etaTotal, name: 'η total (%)', line: { color: G, width: 2 }, yaxis: 'y' },
+        { x: vs.x, y: vs.rpm, name: 'RPM', line: { color: W2, width: 1.6, dash: 'dot' }, yaxis: 'y2' },
+      ], L({ xaxis: { title: 'V (m/s)' }, yaxis: { title: '%', range: [0, 90] },
+        yaxis2: { title: 'rpm', overlaying: 'y', side: 'right', gridcolor: 'rgba(0,0,0,0)' } }), CFG);
+
+      Plotly.react('g-thrust', [
+        { x: gs.x, y: gs.thrust, name: 'Empuje', line: { color: A, width: 2.2 }, yaxis: 'y' },
+        { x: gs.x, y: gs.current, name: 'Corriente (A)', line: { color: C, width: 2, dash: 'dot' }, yaxis: 'y2' },
+      ], L({ xaxis: { title: 'Gas %' }, yaxis: { title: 'g' },
+        yaxis2: { title: 'A', overlaying: 'y', side: 'right', gridcolor: 'rgba(0,0,0,0)' } }), CFG);
+
+      lastConfig = { dt, reserve, Vc, targetG, vThr, vMax, stat, cruise, hover, bestRange: br, sweepV: vs, sweepG: gs };
+      computeFit();
+    }
+
+    // ---- equation modeler (export to aerodynamics) ----
+    const FIT_CURVES: Record<string, { y: (vs: any) => number[]; ySym: string; unit: string; key: string; label: string }> = {
+      thrustN:    { y: (vs) => vs.thrust.map((g: number) => g * 9.80665 / 1000), ySym: 'T', unit: 'N', key: 'thrust_vs_airspeed', label: 'Empuje disponible' },
+      powerShaft: { y: (vs) => vs.powerShaft, ySym: 'P', unit: 'W', key: 'shaft_power_vs_airspeed', label: 'Potencia en el eje' },
+      powerElec:  { y: (vs) => vs.powerElec, ySym: 'P', unit: 'W', key: 'electrical_power_vs_airspeed', label: 'Potencia eléctrica' },
+      current:    { y: (vs) => vs.current, ySym: 'I', unit: 'A', key: 'current_vs_airspeed', label: 'Corriente de batería' },
+      etaTotal:   { y: (vs) => vs.etaTotal, ySym: 'η', unit: '%', key: 'eta_total_vs_airspeed', label: 'Eficiencia total' },
+    };
+
+    function computeFit() {
+      if (!lastConfig) return;
+      const { dt, vThr, vMax, reserve } = lastConfig;
+      const order = num('fit-order');
+      $('fit-order-val').textContent = String(order);
+      const curve = ($('fit-curve') as HTMLSelectElement).value;
+      const meta = FIT_CURVES[curve];
+
+      const vs = velocitySweep(dt, vThr, vMax, reserve, 60);
+      const x = vs.x as number[];
+      const y = meta.y(vs);
+      const fit = polyfit(x, y, order);
+
+      // fitted curve (dense) + sampled data points
+      const xf: number[] = [], yf: number[] = [];
+      for (let i = 0; i <= 120; i++) { const xv = (vMax * i) / 120; xf.push(xv); yf.push(polyval(fit.coeffs, xv)); }
+      const xd: number[] = [], yd: number[] = [];
+      for (let i = 0; i < x.length; i += 3) { xd.push(x[i]); yd.push(y[i]); }
+
+      const A = rgb('--accent'), C = rgb('--cyan');
+      Plotly.react('chart-fit', [
+        { x: xd, y: yd, name: 'modelo (datos)', mode: 'markers', marker: { color: C, size: 6, opacity: 0.7 } },
+        { x: xf, y: yf, name: `ajuste · orden ${fit.order}`, mode: 'lines', line: { color: A, width: 2.6 } },
+      ], L({ xaxis: { title: 'V (m/s)' }, yaxis: { title: meta.unit } }), CFG);
+
+      $('fit-eq').textContent = formatPoly(fit.coeffs, 'V', meta.ySym);
+      $('fit-r2').textContent = fit.r2.toFixed(4);
+      $('fit-rmse').textContent = fit.rmse.toFixed(3) + ' ' + meta.unit;
+      $('fit-coeffs').textContent = '[' + fit.coeffs.map((c) => c.toExponential(4)).join(', ') + ']';
+      lastFit = { curve, meta, fit, vThr, vMax, dt };
+    }
+
+    function exportFitJSON() {
+      if (!lastFit) return;
+      const { meta, fit, vThr, vMax, dt } = lastFit;
+      const obj = {
+        schema: 'uav-suite/propulsion-equation@1',
+        curve: meta.key,
+        throttle: vThr,
+        input: { symbol: 'V', unit: 'm/s', min: 0, max: vMax },
+        output: { symbol: meta.ySym, unit: meta.unit, quantity: meta.label },
+        polynomial: { order: fit.order, form: 'ascending', coeffs: fit.coeffs },
+        evaluate: formatPoly(fit.coeffs, 'V', meta.ySym),
+        fitQuality: { r2: fit.r2, rmse: fit.rmse },
+        driveTrain: dt,
+        generatedAt: new Date().toISOString(),
+      };
+      download(`propulsion_eq_${meta.key}.json`, JSON.stringify(obj, null, 2), 'application/json');
+    }
+
+    function copyFit() {
+      if (!lastFit) return;
+      const txt = JSON.stringify(lastFit.fit.coeffs);
+      const done = () => { const b = $('btn-fit-copy'); const t = b.textContent; b.textContent = 'Copiado ✓'; setTimeout(() => (b.textContent = t), 1200); };
+      if (navigator.clipboard) navigator.clipboard.writeText(txt).then(done, done); else done();
+    }
+
+    function renderWarnings(list: string[]) {
+      const c = $('warnings');
+      if (!list.length) { c.innerHTML = `<div class="card flex items-center gap-2.5 border-success/30 bg-success/5 p-3 text-[12px] text-success"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m20 6-11 11-5-5"/></svg> Configuración dentro de límites de motor, ESC y batería.</div>`; return; }
+      c.innerHTML = list.map((m) => `<div class="card flex items-start gap-2.5 border-warning/40 bg-warning/5 p-3 text-[12px] text-warning"><svg class="mt-0.5 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><span>${m}</span></div>`).join('');
+    }
+
+    function exportCSV() {
+      if (!lastConfig) return;
+      const v = lastConfig.sweepV;
+      let csv = 'speed_ms,thrust_g,current_A,rpm,power_elec_W,power_shaft_W,eta_prop_pct,eta_total_pct,endurance_min,range_km\n';
+      for (let i = 0; i < v.x.length; i++)
+        csv += `${v.x[i].toFixed(1)},${v.thrust[i].toFixed(1)},${v.current[i].toFixed(2)},${v.rpm[i].toFixed(0)},${v.powerElec[i].toFixed(1)},${v.powerShaft[i].toFixed(1)},${v.etaProp[i].toFixed(1)},${v.etaTotal[i].toFixed(1)},${v.endurance[i].toFixed(1)},${v.range[i].toFixed(2)}\n`;
+      download('propulsion_velocity_sweep.csv', csv, 'text/csv');
+    }
+    function exportJSON() {
+      if (!lastConfig) return;
+      const { dt, stat, cruise, hover, bestRange, Vc, targetG, vThr } = lastConfig;
+      download('propulsion_config.json', JSON.stringify({ driveTrain: dt, cruiseSpeed: Vc, targetThrustG: targetG, sweepThrottle: vThr,
+        results: { staticFullThrottle: stat, cruise, targetThrottle: hover, bestRange } }, null, 2), 'application/json');
+    }
+    function download(name: string, data: string, type: string) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([data], { type }));
+      a.download = name; a.click(); URL.revokeObjectURL(a.href);
+    }
+
+    // wiring
+    ($('sel-motor') as HTMLSelectElement).addEventListener('change', (e) => { loadMotor((e.target as HTMLSelectElement).value); compute(); });
+    ($('sel-prop') as HTMLSelectElement).addEventListener('change', (e) => { loadProp((e.target as HTMLSelectElement).value); compute(); });
+    ($('sel-batt') as HTMLSelectElement).addEventListener('change', (e) => { loadBatt((e.target as HTMLSelectElement).value); compute(); });
+    ($('sel-esc') as HTMLSelectElement).addEventListener('change', (e) => { loadEsc((e.target as HTMLSelectElement).value); compute(); });
+    document.querySelectorAll('input').forEach((el) => el.addEventListener('input', compute));
+    $('btn-csv').addEventListener('click', exportCSV);
+    $('btn-json').addEventListener('click', exportJSON);
+    ($('fit-curve') as HTMLSelectElement).addEventListener('change', computeFit);
+    ($('fit-order') as HTMLInputElement).addEventListener('input', computeFit);
+    $('btn-fit-json').addEventListener('click', exportFitJSON);
+    $('btn-fit-copy').addEventListener('click', copyFit);
+    $('btn-xc').addEventListener('click', () => {
+      const setSel = (id: string, v: string) => { ($(id) as HTMLSelectElement).value = v; };
+      setSel('sel-motor', 'emax-gt2826-1090kv'); loadMotor('emax-gt2826-1090kv');
+      if (PROPS.find((p) => p.id === 'aeronaut-cam-carbon-10x5-folding')) { setSel('sel-prop', 'aeronaut-cam-carbon-10x5-folding'); loadProp('aeronaut-cam-carbon-10x5-folding'); }
+      const b4 = BATTERIES.find((b) => b.cells === 4 && b.capacityMah >= 1800);
+      if (b4) { setSel('sel-batt', b4.id); loadBatt(b4.id); }
+      setSel('sel-esc', 'apd-50f3'); loadEsc('apd-50f3');
+      ($('cruisev') as HTMLInputElement).value = '18'; ($('weight') as HTMLInputElement).value = '1500';
+      compute();
+    });
+    $('btn-xc27').addEventListener('click', () => {
+      // XtraChallenge 2027: GT2820/06 985KV, LiPo ≤ 3S, ESC ≥ 40 A
+      const setSel = (id: string, v: string) => { ($(id) as HTMLSelectElement).value = v; };
+      setSel('sel-motor', 'emax-gt2820-985kv'); loadMotor('emax-gt2820-985kv');
+      const p27 = PROPS.find((p) => p.dia === 14 && p.pitch === 8 && p.folding);
+      if (p27) { setSel('sel-prop', p27.id); loadProp(p27.id); }
+      const b3 = BATTERIES.find((b) => b.cells === 3 && b.capacityMah >= 4000 && b.massG > 0);
+      if (b3) { setSel('sel-batt', b3.id); loadBatt(b3.id); }
+      setSel('sel-esc', 'hobbywing-60'); loadEsc('hobbywing-60');
+      ($('cruisev') as HTMLInputElement).value = '18'; ($('weight') as HTMLInputElement).value = '4500';
+      compute();
+    });
+    window.addEventListener('themechange', () => compute());
+
+    // init
+    loadMotor(MOTORS[0].id); loadProp(PROPS[0].id); loadBatt(BATTERIES[0].id); loadEsc(ESCS[0].id);
+    // prefer XC defaults on first load
+    ($('btn-xc') as HTMLButtonElement).click();
+  </script>
+</AppShell>

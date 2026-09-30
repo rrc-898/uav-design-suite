@@ -1,0 +1,1173 @@
+[
+ {
+  "id": "aeronaut-cam-carbon-10x12-folding",
+  "name": "AeroNaut Cam Carbon 10x12 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 10.0,
+  "pitch": 12.0,
+  "ct": [
+   0.12215835772915319,
+   0.039971317269883726,
+   -0.09639767529763264
+  ],
+  "cp": [
+   0.1276632882886508,
+   0.0,
+   -0.16679204626896713,
+   0.25005129454252273,
+   -0.11806940855160351
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-10x4-folding",
+  "name": "AeroNaut Cam Carbon 10x4 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 10.0,
+  "pitch": 4.0,
+  "ct": [
+   0.07731754448782273,
+   -0.05473663222912724,
+   -0.16011655126485905
+  ],
+  "cp": [
+   0.02390939885154126,
+   0.0,
+   0.04981980307894588,
+   -0.2862398956948624,
+   0.1835060996473353
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-10x5-folding",
+  "name": "AeroNaut Cam Carbon 10x5 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 10.0,
+  "pitch": 5.0,
+  "ct": [
+   0.09331149195853065,
+   -0.05707912574417849,
+   -0.14737373680837001
+  ],
+  "cp": [
+   0.03182777113345886,
+   0.0,
+   0.11919759729548644,
+   -0.48178047532138546,
+   0.3231771874263726
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-10x6-folding",
+  "name": "AeroNaut Cam Carbon 10x6 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 10.0,
+  "pitch": 6.0,
+  "ct": [
+   0.11172682458374823,
+   -0.04154030879579838,
+   -0.15106940020625645
+  ],
+  "cp": [
+   0.040959683535114186,
+   0.0,
+   0.1581745012972989,
+   -0.5057786189032473,
+   0.29065356348214283
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-10x7-folding",
+  "name": "AeroNaut Cam Carbon 10x7 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 10.0,
+  "pitch": 7.0,
+  "ct": [
+   0.11695691768239701,
+   -0.03822326543190199,
+   -0.1250990516390924
+  ],
+  "cp": [
+   0.049301082533678764,
+   0.0,
+   0.11919092977045616,
+   -0.34113031687550455,
+   0.1625646500618719
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-10x8-folding",
+  "name": "AeroNaut Cam Carbon 10x8 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 10.0,
+  "pitch": 8.0,
+  "ct": [
+   0.12550720172035715,
+   -0.009695912381388698,
+   -0.133975221184824
+  ],
+  "cp": [
+   0.061230449501903865,
+   0.0,
+   0.060680566955141464,
+   -0.1337892580999174,
+   0.016551928148990314
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-11x10-folding",
+  "name": "AeroNaut Cam Carbon 11x10 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 11.0,
+  "pitch": 10.0,
+  "ct": [
+   0.11685939055551414,
+   0.031147906184712335,
+   -0.1300897503895396
+  ],
+  "cp": [
+   0.073991687993181,
+   0.0,
+   0.03411834739442449,
+   -0.07353163905124861
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-11x12-folding",
+  "name": "AeroNaut Cam Carbon 11x12 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 11.0,
+  "pitch": 12.0,
+  "ct": [
+   0.11163996263317653,
+   0.034897195117380785,
+   -0.09378385274638125
+  ],
+  "cp": [
+   0.09331815191870975,
+   0.0,
+   0.008234931382000517,
+   -0.03632992279354923
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-11x4-folding",
+  "name": "AeroNaut Cam Carbon 11x4 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 11.0,
+  "pitch": 4.0,
+  "ct": [
+   0.07167968975821402,
+   -0.05567224073098811,
+   -0.17053158730979487
+  ],
+  "cp": [
+   0.02328752886184122,
+   0.0,
+   -0.011218756936220051,
+   -0.09945821368581073
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-11x6-folding",
+  "name": "AeroNaut Cam Carbon 11x6 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 11.0,
+  "pitch": 6.0,
+  "ct": [
+   0.1107833642803607,
+   -0.04904682170569981,
+   -0.14193164066076713
+  ],
+  "cp": [
+   0.04228002398516316,
+   0.0,
+   0.0251481710631818,
+   -0.1135917596005983
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-11x7-folding",
+  "name": "AeroNaut Cam Carbon 11x7 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 11.0,
+  "pitch": 7.0,
+  "ct": [
+   0.11420722756674438,
+   -0.03147228030073847,
+   -0.13902051883770591
+  ],
+  "cp": [
+   0.046202522004538664,
+   0.0,
+   0.042909309253151624,
+   -0.12004379330255315
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-11x8-folding",
+  "name": "AeroNaut Cam Carbon 11x8 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 11.0,
+  "pitch": 8.0,
+  "ct": [
+   0.11472006595755126,
+   -0.019009976497363523,
+   -0.1392546176002748
+  ],
+  "cp": [
+   0.04954233440080937,
+   0.0,
+   0.0445612292890783,
+   -0.11433528122955418
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-125x6-folding",
+  "name": "AeroNaut Cam Carbon 125x6 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 12.5,
+  "pitch": 6.0,
+  "ct": [
+   0.08830010330470342,
+   -0.05760685047664717,
+   -0.1272012517536592
+  ],
+  "cp": [
+   0.0297374176253611,
+   0.0,
+   0.01344665688161854,
+   -0.11069105879572746
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-125x75-folding",
+  "name": "AeroNaut Cam Carbon 125x75 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 12.5,
+  "pitch": 7.5,
+  "ct": [
+   0.10898827784765638,
+   -0.030022847830098676,
+   -0.1316856231862561
+  ],
+  "cp": [
+   0.04428436878957946,
+   0.0,
+   0.05247141445049207,
+   -0.13223431389161816
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-125x9-folding",
+  "name": "AeroNaut Cam Carbon 125x9 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 12.5,
+  "pitch": 9.0,
+  "ct": [
+   0.09941847096144842,
+   0.0018433506539873102,
+   -0.1425090549744513
+  ],
+  "cp": [
+   0.04331393400770502,
+   0.0,
+   0.05340688746070829,
+   -0.11905161004930677
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-12x10-folding",
+  "name": "AeroNaut Cam Carbon 12x10 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 12.0,
+  "pitch": 10.0,
+  "ct": [
+   0.12401699496291416,
+   0.022626672329840877,
+   -0.1731144319272168
+  ],
+  "cp": [
+   0.06165331762724945,
+   0.0,
+   0.04230503825496935,
+   -0.10733775544401901
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-12x13-folding",
+  "name": "AeroNaut Cam Carbon 12x13 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 12.0,
+  "pitch": 13.0,
+  "ct": [
+   0.09961903161979885,
+   0.041890837419944635,
+   -0.09867283611584902
+  ],
+  "cp": [
+   0.07896404385332363,
+   0.0,
+   0.0209810411773508,
+   -0.04424125821163522
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-12x5-folding",
+  "name": "AeroNaut Cam Carbon 12x5 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 12.0,
+  "pitch": 5.0,
+  "ct": [
+   0.08236476797639924,
+   -0.05181925922971095,
+   -0.15521322437641719
+  ],
+  "cp": [
+   0.02723299233898477,
+   0.0,
+   0.002582245508856705,
+   -0.10557683136863351
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-12x65-folding",
+  "name": "AeroNaut Cam Carbon 12x65 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 12.0,
+  "pitch": 6.5,
+  "ct": [
+   0.09432581911965199,
+   -0.05310118739058802,
+   -0.13324782646257374
+  ],
+  "cp": [
+   0.03437145110955485,
+   0.0,
+   -0.00020811179610664542,
+   -0.08421219367113751
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-12x6-folding",
+  "name": "AeroNaut Cam Carbon 12x6 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 12.0,
+  "pitch": 6.0,
+  "ct": [
+   0.10679796371019173,
+   -0.0818444741788193,
+   -0.14670973049927757
+  ],
+  "cp": [
+   0.036361005162514816,
+   0.0,
+   -0.04172195540834631,
+   -0.047370757813116185
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-12x8-folding",
+  "name": "AeroNaut Cam Carbon 12x8 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 12.0,
+  "pitch": 8.0,
+  "ct": [
+   0.12097977238357617,
+   -0.010177228256002322,
+   -0.19537737060420055
+  ],
+  "cp": [
+   0.04752808055064061,
+   0.0,
+   0.05013126281942554,
+   -0.14758479598736873
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-12x9-folding",
+  "name": "AeroNaut Cam Carbon 12x9 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 12.0,
+  "pitch": 9.0,
+  "ct": [
+   0.12617584588982203,
+   -0.011194427442182867,
+   -0.1479751250812442
+  ],
+  "cp": [
+   0.057537811682307434,
+   0.0,
+   0.05825135793734688,
+   -0.12818285983691183
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-13x10-folding",
+  "name": "AeroNaut Cam Carbon 13x10 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 13.0,
+  "pitch": 10.0,
+  "ct": [
+   0.10334401894686121,
+   0.04729444405028546,
+   -0.16324377802218165
+  ],
+  "cp": [
+   0.061798096880062985,
+   -0.039532666014120574,
+   0.13980609670231428,
+   -0.1604791402943578
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-13x11-folding",
+  "name": "AeroNaut Cam Carbon 13x11 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 13.0,
+  "pitch": 11.0,
+  "ct": [
+   0.11237775120831225,
+   0.015748614240964205,
+   -0.15479577365795558
+  ],
+  "cp": [
+   0.05034475961846138,
+   0.0,
+   0.07560969627047563,
+   -0.1276512460095185,
+   -0.007484262707416885
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-13x5-folding",
+  "name": "AeroNaut Cam Carbon 13x5 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 13.0,
+  "pitch": 5.0,
+  "ct": [
+   0.0724747087553459,
+   -0.05054235400244087,
+   -0.16333350526807097
+  ],
+  "cp": [
+   0.02205142813311531,
+   0.005674775301419048,
+   -0.027209283519135673,
+   -0.07679097320002848
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-13x65-folding",
+  "name": "AeroNaut Cam Carbon 13x65 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 13.0,
+  "pitch": 6.5,
+  "ct": [
+   0.0967078869708354,
+   -0.047663137846456906,
+   -0.1602701140938545
+  ],
+  "cp": [
+   0.03170305435343038,
+   0.017772156027386413,
+   -0.040387098855229675,
+   -0.0691931852482165
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-13x8-folding",
+  "name": "AeroNaut Cam Carbon 13x8 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 13.0,
+  "pitch": 8.0,
+  "ct": [
+   0.09809958769794454,
+   -0.019652987739158845,
+   -0.13422616655738034
+  ],
+  "cp": [
+   0.03658713797453273,
+   0.020513827361814858,
+   -0.004875217597357887,
+   -0.08495297158182853
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-14x12-folding",
+  "name": "AeroNaut Cam Carbon 14x12 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 14.0,
+  "pitch": 12.0,
+  "ct": [
+   0.11896947170077007,
+   0.014186923200576169,
+   -0.12739836650321515
+  ],
+  "cp": [
+   0.06891312328405774,
+   -0.016987852444493596,
+   0.06970065460910438,
+   -0.10273876206119167
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-14x6-folding",
+  "name": "AeroNaut Cam Carbon 14x6 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 14.0,
+  "pitch": 6.0,
+  "ct": [
+   0.07646084990789068,
+   -0.06384700373875848,
+   -0.1424315028568264
+  ],
+  "cp": [
+   0.022930293578964395,
+   0.013855228355638865,
+   -0.06834233312582352,
+   -0.025476098787515798
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-14x8-folding",
+  "name": "AeroNaut Cam Carbon 14x8 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 14.0,
+  "pitch": 8.0,
+  "ct": [
+   0.11746657405742318,
+   -0.03361945084263911,
+   -0.16491794579395266
+  ],
+  "cp": [
+   0.04345646963058848,
+   0.0,
+   0.052476464120968506,
+   -0.15255342621859705
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-14x9-folding",
+  "name": "AeroNaut Cam Carbon 14x9 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 14.0,
+  "pitch": 9.0,
+  "ct": [
+   0.12293574020175832,
+   -0.007676558313296381,
+   -0.17850515919820967
+  ],
+  "cp": [
+   0.05093816256405122,
+   -0.003619542772605926,
+   0.06795852633410021,
+   -0.15594595595211921
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-15x10-folding",
+  "name": "AeroNaut Cam Carbon 15x10 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 15.0,
+  "pitch": 10.0,
+  "ct": [
+   0.10798191740091613,
+   -0.018184777069590995,
+   -0.13845655307586746
+  ],
+  "cp": [
+   0.043767220196902594,
+   0.0,
+   0.045808949719657543,
+   -0.12024662051406333
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-15x6-folding",
+  "name": "AeroNaut Cam Carbon 15x6 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 15.0,
+  "pitch": 6.0,
+  "ct": [
+   0.06611457530471009,
+   -0.04910597714554751,
+   -0.16300616760339642
+  ],
+  "cp": [
+   0.019424110672101282,
+   0.0,
+   -0.004645795206199742,
+   -0.10350603956565918
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-15x8-folding",
+  "name": "AeroNaut Cam Carbon 15x8 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 15.0,
+  "pitch": 8.0,
+  "ct": [
+   0.095176611510463,
+   -0.04083550054152981,
+   -0.14447841054687355
+  ],
+  "cp": [
+   0.03269781208562721,
+   0.0,
+   0.0315541598973219,
+   -0.1277491863499946
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-16x6-folding",
+  "name": "AeroNaut Cam Carbon 16x6 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 16.0,
+  "pitch": 6.0,
+  "ct": [
+   0.06538391285600877,
+   -0.05250100269741772,
+   -0.15222039609673177
+  ],
+  "cp": [
+   0.01864557085047473,
+   0.0,
+   -0.0019312835523871495,
+   -0.10342481423825331
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-16x8-folding",
+  "name": "AeroNaut Cam Carbon 16x8 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 16.0,
+  "pitch": 8.0,
+  "ct": [
+   0.09266682577798199,
+   -0.03427831451227165,
+   -0.1377999403856919
+  ],
+  "cp": [
+   0.031947264087847885,
+   0.0,
+   0.03606570999252115,
+   -0.12415159726184612
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-21x13-folding",
+  "name": "AeroNaut Cam Carbon 21x13 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 21.0,
+  "pitch": 13.0,
+  "ct": [
+   0.11000335704658634,
+   -0.04248234677571313,
+   -0.1433680250148955
+  ],
+  "cp": [
+   0.03886911881091353,
+   0.0,
+   0.03332208223553737,
+   -0.12028720767768236
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-9x4-folding",
+  "name": "AeroNaut Cam Carbon 9x4 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 9.0,
+  "pitch": 4.0,
+  "ct": [
+   0.08387693380737603,
+   -0.058318593227221736,
+   -0.1447671253412065
+  ],
+  "cp": [
+   0.03283863860751787,
+   0.0,
+   0.0036672860300755094,
+   -0.14311290022401407,
+   0.060111508534893686
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-9x5-folding",
+  "name": "AeroNaut Cam Carbon 9x5 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 9.0,
+  "pitch": 5.0,
+  "ct": [
+   0.10566378866853518,
+   -0.05252487292380817,
+   -0.13694605758757072
+  ],
+  "cp": [
+   0.04276139415589149,
+   0.0,
+   0.06582270419172494,
+   -0.2772605902189711,
+   0.13930550006158599
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-9x6-folding",
+  "name": "AeroNaut Cam Carbon 9x6 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 9.0,
+  "pitch": 6.0,
+  "ct": [
+   0.11206160242877566,
+   -0.04200580461888861,
+   -0.12175342084814664
+  ],
+  "cp": [
+   0.05122579893834403,
+   0.0,
+   0.04736252199096796,
+   -0.1935610053878472,
+   0.08075103918711227
+  ],
+  "folding": true
+ },
+ {
+  "id": "aeronaut-cam-carbon-9x7-folding",
+  "name": "AeroNaut Cam Carbon 9x7 folding",
+  "brand": "AeroNaut",
+  "family": "Cam Carbon folding",
+  "dia": 9.0,
+  "pitch": 7.0,
+  "ct": [
+   0.12451308984468003,
+   -0.010398771921855477,
+   -0.13896771773315209
+  ],
+  "cp": [
+   0.06299461618391457,
+   0.0,
+   0.06555122091847268,
+   -0.1719529670318384,
+   0.05024110857929321
+  ],
+  "folding": true
+ },
+ {
+  "id": "apc-electric-12x10",
+  "name": "APC Electric 12x10",
+  "brand": "APC",
+  "family": "Electric",
+  "dia": 12.0,
+  "pitch": 10.0,
+  "ct": [
+   0.12401699496291416,
+   0.022626672329840877,
+   -0.1731144319272168
+  ],
+  "cp": [
+   0.06165331762724945,
+   0.0,
+   0.04230503825496935,
+   -0.10733775544401901
+  ],
+  "folding": false
+ },
+ {
+  "id": "apc-electric-12x6",
+  "name": "APC Electric 12x6",
+  "brand": "APC",
+  "family": "Electric",
+  "dia": 12.0,
+  "pitch": 6.0,
+  "ct": [
+   0.10679796371019173,
+   -0.0818444741788193,
+   -0.14670973049927757
+  ],
+  "cp": [
+   0.036361005162514816,
+   0.0,
+   -0.04172195540834631,
+   -0.047370757813116185
+  ],
+  "folding": false
+ },
+ {
+  "id": "apc-electric-12x8",
+  "name": "APC Electric 12x8",
+  "brand": "APC",
+  "family": "Electric",
+  "dia": 12.0,
+  "pitch": 8.0,
+  "ct": [
+   0.12097977238357617,
+   -0.010177228256002322,
+   -0.19537737060420055
+  ],
+  "cp": [
+   0.04752808055064061,
+   0.0,
+   0.05013126281942554,
+   -0.14758479598736873
+  ],
+  "folding": false
+ },
+ {
+  "id": "apc-electric-13x10",
+  "name": "APC Electric 13x10",
+  "brand": "APC",
+  "family": "Electric",
+  "dia": 13.0,
+  "pitch": 10.0,
+  "ct": [
+   0.11713705659489453,
+   0.009051490432700794,
+   -0.18135745382050572
+  ],
+  "cp": [
+   0.05064818575936013,
+   0.0,
+   0.05611860430577582,
+   -0.13586355581081672
+  ],
+  "folding": false
+ },
+ {
+  "id": "apc-electric-13x65",
+  "name": "APC Electric 13x65",
+  "brand": "APC",
+  "family": "Electric",
+  "dia": 13.0,
+  "pitch": 6.5,
+  "ct": [
+   0.09926369612919232,
+   -0.0659212991819572,
+   -0.15701362320824658
+  ],
+  "cp": [
+   0.03367579416938507,
+   0.0,
+   -0.013084237068399741,
+   -0.08854540472828192
+  ],
+  "folding": false
+ },
+ {
+  "id": "apc-electric-13x8",
+  "name": "APC Electric 13x8",
+  "brand": "APC",
+  "family": "Electric",
+  "dia": 13.0,
+  "pitch": 8.0,
+  "ct": [
+   0.10918201349051453,
+   -0.03653341505217277,
+   -0.1718789783644183
+  ],
+  "cp": [
+   0.03973812263839921,
+   0.0,
+   0.029884974995852808,
+   -0.13162934540196625
+  ],
+  "folding": false
+ },
+ {
+  "id": "apc-electric-14x10",
+  "name": "APC Electric 14x10",
+  "brand": "APC",
+  "family": "Electric",
+  "dia": 14.0,
+  "pitch": 10.0,
+  "ct": [
+   0.10919981388167964,
+   -0.0057337973417242345,
+   -0.17141989444435352
+  ],
+  "cp": [
+   0.04386711499937359,
+   0.0,
+   0.03821775044357371,
+   -0.121012360028506
+  ],
+  "folding": false
+ },
+ {
+  "id": "apc-electric-14x7",
+  "name": "APC Electric 14x7",
+  "brand": "APC",
+  "family": "Electric",
+  "dia": 14.0,
+  "pitch": 7.0,
+  "ct": [
+   0.09591199298692184,
+   -0.07787951559150413,
+   -0.1390079422068235
+  ],
+  "cp": [
+   0.03134563688782966,
+   0.0,
+   -0.02046934190837221,
+   -0.0761181174192428
+  ],
+  "folding": false
+ },
+ {
+  "id": "apc-electric-14x85",
+  "name": "APC Electric 14x85",
+  "brand": "APC",
+  "family": "Electric",
+  "dia": 14.0,
+  "pitch": 8.5,
+  "ct": [
+   0.10932636670171901,
+   -0.04239463575487746,
+   -0.15935988901810053
+  ],
+  "cp": [
+   0.039847023898010855,
+   0.0,
+   0.016501576328275983,
+   -0.10774474728740113
+  ],
+  "folding": false
+ },
+ {
+  "id": "apc-electric-16x10",
+  "name": "APC Electric 16x10",
+  "brand": "APC",
+  "family": "Electric",
+  "dia": 16.0,
+  "pitch": 10.0,
+  "ct": [
+   0.10999461505170276,
+   -0.006623462237942841,
+   -0.19313548892947194
+  ],
+  "cp": [
+   0.0407811712610682,
+   0.0,
+   0.05861206314392964,
+   -0.16037650136674003
+  ],
+  "folding": false
+ },
+ {
+  "id": "apc-electric-16x12",
+  "name": "APC Electric 16x12",
+  "brand": "APC",
+  "family": "Electric",
+  "dia": 16.0,
+  "pitch": 12.0,
+  "ct": [
+   0.11514511367684037,
+   0.005995328782889504,
+   -0.17215148851200937
+  ],
+  "cp": [
+   0.048426303417057275,
+   0.0,
+   0.056601802325371986,
+   -0.13445749571165452
+  ],
+  "folding": false
+ },
+ {
+  "id": "apc-electric-16x8",
+  "name": "APC Electric 16x8",
+  "brand": "APC",
+  "family": "Electric",
+  "dia": 16.0,
+  "pitch": 8.0,
+  "ct": [
+   0.09456512283165738,
+   -0.04990209504686362,
+   -0.17498633770905814
+  ],
+  "cp": [
+   0.029732998438301343,
+   0.0,
+   0.025938718033672706,
+   -0.1468145317266939
+  ],
+  "folding": false
+ },
+ {
+  "id": "apc-electric-18x10",
+  "name": "APC Electric 18x10",
+  "brand": "APC",
+  "family": "Electric",
+  "dia": 18.0,
+  "pitch": 10.0,
+  "ct": [
+   0.10609351754530809,
+   -0.03915411701076877,
+   -0.17163156752190825
+  ],
+  "cp": [
+   0.035851157283860124,
+   0.0,
+   0.03473944970268963,
+   -0.14077594431050341
+  ],
+  "folding": false
+ },
+ {
+  "id": "apc-electric-18x12",
+  "name": "APC Electric 18x12",
+  "brand": "APC",
+  "family": "Electric",
+  "dia": 18.0,
+  "pitch": 12.0,
+  "ct": [
+   0.11208167071719051,
+   -0.018922181887816896,
+   -0.16138655383553133
+  ],
+  "cp": [
+   0.04097288663779704,
+   0.0,
+   0.06371362643203408,
+   -0.1516903595692917
+  ],
+  "folding": false
+ },
+ {
+  "id": "apc-electric-18x8",
+  "name": "APC Electric 18x8",
+  "brand": "APC",
+  "family": "Electric",
+  "dia": 18.0,
+  "pitch": 8.0,
+  "ct": [
+   0.09042871964898622,
+   -0.051582221766912364,
+   -0.19283865024577698
+  ],
+  "cp": [
+   0.027482846776890214,
+   0.0,
+   0.016613402867422734,
+   -0.14610473059687637
+  ],
+  "folding": false
+ },
+ {
+  "id": "apc-electric-20x10",
+  "name": "APC Electric 20x10",
+  "brand": "APC",
+  "family": "Electric",
+  "dia": 20.0,
+  "pitch": 10.0,
+  "ct": [
+   0.10054627454691362,
+   -0.029902240271154196,
+   -0.19734315307386108
+  ],
+  "cp": [
+   0.032660100658509175,
+   0.0,
+   0.048382862525894264,
+   -0.17102468379889504
+  ],
+  "folding": false
+ },
+ {
+  "id": "apc-electric-21x13",
+  "name": "APC Electric 21x13",
+  "brand": "APC",
+  "family": "Electric",
+  "dia": 21.0,
+  "pitch": 13.0,
+  "ct": [
+   0.1101229926592465,
+   -0.04090019720244786,
+   -0.1450365404621948
+  ],
+  "cp": [
+   0.038809254326339235,
+   0.0,
+   0.03687145219995127,
+   -0.12448009171362592
+  ],
+  "folding": false
+ }
+]
