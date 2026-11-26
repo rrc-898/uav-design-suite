@@ -1,5 +1,14 @@
 # UAV Design Suite
 
+**Engineering platform to design, simulate and optimise fixed-wing UAVs.** Propulsion, mission and
+aerodynamics modules in one web app, plus a complete design package for the Xtra Challenge 2027 competition.
+
+![Astro](https://img.shields.io/badge/Astro-framework-FF5D01?logo=astro&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+---
+
 Plataforma de ingeniería para el **diseño, simulación y optimización de UAVs**.
 Construida en **Astro + TypeScript + TailwindCSS**, con modo claro/oscuro y una
 estética profesional inspirada en Linear / Vercel / Stripe.
